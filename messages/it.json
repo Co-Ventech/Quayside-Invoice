@@ -1,0 +1,143 @@
+{
+  "Metadata": {
+    "about": {
+      "title": "Generatore gratuito di fatture PDF - EasyInvoicePDF",
+      "description": "EasyInvoicePDF in sintesi: fatture PDF gratuite, anteprima dal vivo, elaborazione nel browser, modelli e link condivisibili. Open source, senza registrazione.",
+      "keywords": "generatore di fatture gratuito, fattura PDF online, strumento di fatturazione, software di fatturazione, fattura open source",
+      "siteName": "EasyInvoicePDF.com | Generatore di Fatture Gratuito"
+    }
+  },
+  "About": {
+    "tagline": "Generatore di fatture gratuito",
+    "hero": {
+      "title": "Crea fatture professionali in pochi secondi",
+      "description": "Un generatore di fatture <span>gratuito e open-source</span> che funziona interamente nel tuo browser. <span>Nessuna registrazione, nessuna pubblicità</span>, e i tuoi dati restano tuoi."
+    },
+    "features": {
+      "badge": "Funzionalità",
+      "title": "Tutto ciò di cui hai bisogno per una fatturazione professionale",
+      "description": "Il nostro generatore di fatture semplice ma potente include tutte le funzionalità necessarie per creare rapidamente fatture professionali.",
+      "comingSoon": "Versione Pro e API in arrivo",
+      "items": {
+        "livePreview": {
+          "title": "Anteprima in Tempo Reale",
+          "description": "Visualizza l'aggiornamento della tua fattura in tempo reale mentre apporti modifiche, assicurandoti che appaia esattamente come desideri."
+        },
+        "shareableLinks": {
+          "title": "Link Condivisibili",
+          "description": "Genera link per condividere le tue fatture direttamente con i clienti senza inviare allegati."
+        },
+        "instantDownload": {
+          "title": "Download Istantaneo",
+          "description": "Scarica la tua fattura in formato PDF con un clic, pronta per essere inviata o stampata."
+        },
+        "multiLanguage": {
+          "title": "Lingue e Valute Multiple",
+          "description": "Crea fatture in 10+ lingue con supporto per tutte le principali valute e formattazione automatica."
+        },
+        "taxSupport": {
+          "title": "Sistema Fiscale Flessibile",
+          "description": "Supporto per qualsiasi sistema fiscale incluso IVA, Sales Tax, GST e altro. Completamente personalizzabile per soddisfare i requisiti locali."
+        },
+        "openSource": {
+          "title": "Open Source",
+          "description": "Completamente gratuito e open-source. Usalo online o ospitalo tu stesso con accesso completo al codice."
+        },
+        "qrCodeMultiPDFpageSupport": {
+          "title": "Codice QR e Supporto PDF Multi-pagina",
+          "description": "Aggiungi codici QR con link di pagamento alle tue fatture e genera PDF multi-pagina per fatture più lunghe con molte voci."
+        }
+      }
+    },
+    "cta": {
+      "title": "Pronto a semplificare la tua fatturazione?",
+      "description": "Inizia a creare fatture professionali in pochi secondi con il nostro strumento gratuito e open-source.",
+      "noSignup": "Nessuna registrazione richiesta. 100% gratuito e open-source."
+    },
+    "footer": {
+      "description": "Uno strumento gratuito e open-source per creare fatture PDF professionali con anteprima in tempo reale.<br></br><br></br>Non è un software di contabilità. Nessuna garanzia di conformità. Utilizzando questo strumento, accetti i <tosLink>Termini di servizio</tosLink>.",
+      "headings": {
+        "about": "Informazioni su EasyInvoicePDF",
+        "solutions": "Soluzioni",
+        "product": "Prodotto",
+        "company": "Azienda",
+        "community": "Community"
+      },
+      "links": {
+        "invoiceGenerator": "Generatore di fatture",
+        "features": "Funzionalità",
+        "github": "GitHub",
+        "howItWorks": "Come funziona",
+        "changelog": "Novità",
+        "founder": "Fondatore",
+        "resources": "Risorse",
+        "termsOfService": "Termini di servizio"
+      },
+      "createdBy": "Creato da"
+    },
+    "buttons": {
+      "goToApp": "Apri",
+      "home": "Chi siamo",
+      "viewOnGithub": "Visualizza su GitHub",
+      "starOnGithub": "GitHub",
+      "switchLanguage": "Cambia lingua",
+      "shareFeedback": "Condividi feedback",
+      "app": "App",
+      "startInvoicing": "Inizia fatturazione",
+      "previousFeature": "Funzionalità precedente",
+      "nextFeature": "Funzionalità successiva"
+    }
+  },
+  "FAQ": {
+    "title": "Domande Frequenti",
+    "description": "Risposte su uso gratuito, privacy, download PDF, utilizzo senza account e condivisione delle fatture con i clienti.",
+    "items": {
+      "whatIs": {
+        "question": "Cos'è EasyInvoicePDF?",
+        "answer": "EasyInvoicePDF è un creatore di fatture gratuito e open source per generare rapidamente fatture PDF professionali. Include anteprima PDF in tempo reale, modelli personalizzabili e supporto per più lingue e valute."
+      },
+      "isFree": {
+        "question": "È davvero gratuito?",
+        "answer": "Sì, EasyInvoicePDF è completamente gratuito. L'intero progetto è open-source e disponibile su GitHub."
+      },
+      "accountNeeded": {
+        "question": "Devo creare un account?",
+        "answer": "Non servono account o registrazione. Puoi creare subito fatture e scaricare il PDF con un clic."
+      },
+      "customization": {
+        "question": "Posso personalizzare il modello della fattura?",
+        "answer": "Sì. Modifichi dati aziendali, valuta, lingua, imposte e layout nell'editor. Aggiungiamo regolarmente nuovi controlli sul modello."
+      },
+      "dataSecurity": {
+        "question": "I miei dati sono sicuri?",
+        "answer": "I dati della fattura sono elaborati nel browser per anteprima e generazione PDF. Non memorizziamo il contenuto delle tue fatture sui nostri server."
+      },
+      "sharing": {
+        "question": "Posso condividere le fatture con altri?",
+        "answer": "Sì. Crei un link condivisibile: i clienti vedono la fattura e scaricano il PDF. Solo chi ha il link può aprirlo."
+      },
+      "howItWorks": {
+        "question": "Come funziona EasyInvoicePDF?",
+        "answer": "Inserisci i dati della fattura, visualizza subito l'anteprima del PDF, quindi scarica o condividi la fattura."
+      },
+      "whoItIsFor": {
+        "question": "A chi è rivolto EasyInvoicePDF?",
+        "answer": "EasyInvoicePDF è pensato per freelance, consulenti, agenzie, professionisti e piccole imprese che devono creare rapidamente una fattura senza software di contabilità complicati."
+      },
+      "whyEasyInvoicePdf": {
+        "question": "Perché scegliere EasyInvoicePDF?",
+        "answer": "A differenza delle piattaforme di fatturazione tradizionali, EasyInvoicePDF non richiede un account ed elabora la fattura interamente nel tuo browser."
+      }
+    }
+  },
+  "BrowserSupport": {
+    "outdated": {
+      "title": "Il tuo browser non è aggiornato",
+      "description": "{browser} {version} ha più di tre anni. Aggiornalo all'ultima versione per far funzionare tutto correttamente."
+    },
+    "unsupported": {
+      "title": "Il tuo browser non è più supportato",
+      "description": "{browser} {version} è troppo vecchio per far funzionare questa app in modo affidabile. Aggiornalo all'ultima versione."
+    }
+  }
+}

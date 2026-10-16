@@ -1,0 +1,102 @@
+import type { Metadata } from "next";
+
+import { Footer } from "@/app/(components)/footer";
+import { Header } from "@/app/(components)/header";
+import {
+  PERSONAL_WEBSITE_URL,
+  STATIC_ASSETS_URL,
+  TWITTER_CREATOR,
+} from "@/config";
+
+import { HowItWorksJsonLd } from "./how-it-works-json-ld";
+
+const HOW_IT_WORKS_PAGE_URL = "https://quayside-invoice.example/how-it-works";
+
+const PAGE_TITLE = "How Quayside Invoice Works | Video Tutorials";
+
+const PAGE_DESCRIPTION =
+  "Watch step-by-step video tutorials on creating invoices, saving seller and buyer details, customizing tax, and generating weekly invoices with Quayside Invoice.";
+
+export const metadata: Metadata = {
+  title: PAGE_TITLE,
+  description: PAGE_DESCRIPTION,
+  keywords: [
+    "how quayside invoice works",
+    "invoice generator tutorial",
+    "create invoice video",
+    "add seller invoice",
+    "add buyer invoice",
+    "custom tax invoice",
+    "vat invoice tutorial",
+    "weekly invoices",
+    "quayside invoice demo",
+    "pdf invoice generator guide",
+  ],
+  authors: [{ name: "Saltmarsh Coffee Roasters" }],
+  creator: "Saltmarsh Coffee Roasters",
+  publisher: "Saltmarsh Coffee Roasters",
+  alternates: {
+    canonical: HOW_IT_WORKS_PAGE_URL,
+    types: {
+      "text/markdown": "https://quayside-invoice.example/how-it-works.md",
+    },
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+  openGraph: {
+    title: PAGE_TITLE,
+    description: PAGE_DESCRIPTION,
+    siteName: "Quayside Invoice | Free Invoice PDF Generator",
+    type: "website",
+    locale: "en_US",
+    url: HOW_IT_WORKS_PAGE_URL,
+    images: [
+      {
+        url: `${STATIC_ASSETS_URL}/easy-invoice-opengraph-image.png?v=1755773879597`,
+        type: "image/png",
+        width: 1200,
+        height: 630,
+        alt: "Quayside Invoice - Free Invoice PDF Generator",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: PAGE_TITLE,
+    description: PAGE_DESCRIPTION,
+    creator: TWITTER_CREATOR,
+    images: [
+      {
+        url: `${STATIC_ASSETS_URL}/easy-invoice-opengraph-image.png?v=1755773879597`,
+        type: "image/png",
+        width: 1200,
+        height: 630,
+        alt: "Quayside Invoice - Free Invoice PDF Generator",
+      },
+    ],
+  },
+};
+
+interface HowItWorksLayoutProps {
+  children: React.ReactNode;
+}
+
+export default function HowItWorksLayout({ children }: HowItWorksLayoutProps) {
+  return (
+    <>
+      <HowItWorksJsonLd />
+      <Header />
+      {children}
+      <Footer />
+    </>
+  );
+}

@@ -1,0 +1,508 @@
+import { expect, test } from "@playwright/test";
+
+import { PDF_DATA_LOCAL_STORAGE_KEY, type InvoiceData } from "@/app/schema";
+
+import { waitForPdfRegeneration } from "../utils/pdf-download";
+import { uploadLogoFile } from "./utils";
+
+test.describe("Stripe Invoice Sharing Logic", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/");
+  });
+
+  test("can share invoice with Stripe template and *WITHOUT* logo", async ({
+    page,
+  }) => {
+    // Verify default template is selected by default
+    await expect(page).toHaveURL("/");
+
+    // Switch to Stripe template
+    await page
+      .getByRole("combobox", { name: "Invoice Template" })
+      .selectOption("stripe");
+
+    // Wait for URL to be updated
+    await page.waitForURL("/stripe-template");
+
+    await expect(page).toHaveURL("/stripe-template");
+
+    // Verify share button is still enabled (no logo uploaded)
+    const shareButton = page.getByRole("button", {
+      name: "Get link",
+    });
+    await expect(shareButton).toBeVisible();
+    await expect(shareButton).toBeEnabled();
+
+    // Click share button
+    await shareButton.click();
+
+    // Verify URL contains shared data
+    await page.waitForURL((url) => {
+      return url.searchParams.has("data");
+    });
+    const url = page.url();
+    expect(url).toContain("/stripe-template?data=");
+
+    // Verify data parameter is not empty
+    const urlObj = new URL(url);
+    const dataParam = urlObj.searchParams.get("data");
+    expect(dataParam).toBeTruthy();
+    expect(dataParam).not.toBe("");
+
+    // ------------------------------------------------------------
+    // Open URL in new tab
+    // ------------------------------------------------------------
+    const context = page.context();
+    const newPage = await context.newPage();
+    const newPageResponse = await newPage.goto(url);
+
+    // Verify that the shared URL is not indexed by search engines (to prevent sensitive
+    // data from being indexed). The page is prerendered, so this is a response header
+    // rather than the robots meta tag.
+    expect(newPageResponse?.headers()["x-robots-tag"]).toBe(
+      "noindex, nofollow",
+    );
+
+    const newUrl = newPage.url();
+    expect(newUrl).toContain("/stripe-template?data=");
+
+    // Verify data parameter is not empty
+    const newUrlObj = new URL(newUrl);
+    const newDataParam = newUrlObj.searchParams.get("data");
+    expect(newDataParam).toBeTruthy();
+    expect(newDataParam).not.toBe("");
+
+    // Verify stripe template UI elements are visible
+    const newPageGeneralInfoSection = newPage.getByTestId(
+      "general-information-section",
+    );
+
+    // Verify logo upload section is visible (but empty since no logo was shared)
+    await expect(
+      newPageGeneralInfoSection.getByText("Company Logo", { exact: true }),
+    ).toBeVisible();
+
+    // Verify payment URL section is visible
+    await expect(
+      newPageGeneralInfoSection.getByRole("textbox", {
+        name: "Payment Link URL",
+      }),
+    ).toBeVisible();
+
+    const finalSection = newPage.getByTestId(`final-section`);
+
+    /** TEST PERSON AUTHORIZED TO RECEIVE FIELD TO BE HIDDEN (there are only for default template)*/
+    const personAuthorizedToReceiveFieldset = finalSection.getByRole("group", {
+      name: "Person Authorized to Receive",
+    });
+
+    await expect(personAuthorizedToReceiveFieldset).toBeHidden();
+
+    /** TEST PERSON AUTHORIZED TO ISSUE FIELD TO BE HIDDEN (there are only for default template)*/
+    const personAuthorizedToIssueFieldset = finalSection.getByRole("group", {
+      name: "Person Authorized to Issue",
+    });
+
+    await expect(personAuthorizedToIssueFieldset).toBeHidden();
+
+    // Close the new page
+    await newPage.close();
+  });
+
+  test("cannot share invoice with Stripe template and *WITH* logo", async ({
+    page,
+  }) => {
+    // Verify default template is selected by default
+    await expect(page).toHaveURL("/");
+
+    // Switch to Stripe template
+    await page
+      .getByRole("combobox", { name: "Invoice Template" })
+      .selectOption("stripe");
+
+    // Upload logo
+    await uploadLogoFile(page);
+
+    // Wait for logo to be uploaded
+    const generalInfoSection = page.getByTestId("general-information-section");
+    await expect(
+      generalInfoSection.getByAltText("Company logo preview"),
+    ).toBeVisible();
+
+    // Verify share button is disabled
+    const shareButton = page.getByRole("button", {
+      name: "Get link",
+    });
+    await expect(shareButton).toHaveAttribute("data-disabled", "true");
+
+    // click over share button to verify tooltip
+    // on mobile, we need to click the button to show the toast because it's better UX for user (you can't hover on mobile)
+    await shareButton.click();
+
+    await expect(page.getByText("Unable to Share Invoice")).toBeVisible();
+
+    await expect(
+      page.getByText(
+        "Invoices with logos cannot be shared. Please remove the logo to generate a shareable link. You can still download the invoice as PDF and share it.",
+      ),
+    ).toBeVisible();
+  });
+
+  test("share button becomes enabled again after removing logo", async ({
+    page,
+  }) => {
+    // Verify default template is selected by default
+    await expect(page).toHaveURL("/");
+
+    // Switch to Stripe template and upload logo
+    await page
+      .getByRole("combobox", { name: "Invoice Template" })
+      .selectOption("stripe");
+
+    // Upload logo
+    await waitForPdfRegeneration(page, async () => {
+      await uploadLogoFile(page);
+    });
+
+    const generalInfoSection = page.getByTestId("general-information-section");
+    await expect(
+      generalInfoSection.getByAltText("Company logo preview"),
+    ).toBeVisible();
+
+    // Verify share button is disabled
+    const shareButton = page.getByRole("button", {
+      name: "Get link",
+    });
+    await expect(shareButton).toHaveAttribute("data-disabled", "true");
+
+    // Remove the logo
+    await generalInfoSection
+      .getByRole("button", { name: "Remove logo" })
+      .click();
+
+    // Wait for logo to be removed
+    await expect(
+      generalInfoSection.getByAltText("Company logo preview"),
+    ).toBeHidden();
+
+    // Verify share button is enabled again
+    await expect(shareButton).toHaveAttribute("data-disabled", "false");
+    await expect(shareButton).toBeEnabled();
+
+    // Test that sharing works
+    await shareButton.click();
+
+    // Verify the share invoice link description toast appears after generating the link
+    const toast = page.getByTestId("share-invoice-link-description-toast");
+    await expect(toast).toBeVisible();
+
+    await expect(
+      page.getByText(
+        "Share this link to let others view and edit this invoice",
+      ),
+    ).toBeVisible();
+
+    // verify URL contains data parameter
+    await page.waitForURL((url) => {
+      return url.searchParams.has("data");
+    });
+
+    const url = page.url();
+    expect(url).toContain("/stripe-template?data=");
+
+    // Verify data parameter is not empty
+    const urlObj = new URL(url);
+    const dataParam = urlObj.searchParams.get("data");
+    expect(dataParam).toBeTruthy();
+    expect(dataParam).not.toBe("");
+  });
+
+  test("share button stays disabled after switching templates when logo exists, re-enables after removing logo", async ({
+    page,
+  }) => {
+    // Verify default template is selected by default
+    await expect(page).toHaveURL("/");
+
+    // Start with default template and verify share button is enabled
+    const shareButton = page.getByRole("button", {
+      name: "Get link",
+    });
+    await expect(shareButton).toBeEnabled();
+
+    // Switch to Stripe template
+    await page
+      .getByRole("combobox", { name: "Invoice Template" })
+      .selectOption("stripe");
+
+    // Upload logo
+    await uploadLogoFile(page);
+
+    // Verify share button becomes disabled
+    await expect(shareButton).toHaveAttribute("data-disabled", "true");
+
+    // Switch back to default template
+    await page
+      .getByRole("combobox", { name: "Invoice Template" })
+      .selectOption("default");
+
+    // Logo persists across template switches, so share button stays disabled
+    await expect(shareButton).toHaveAttribute("data-disabled", "true");
+
+    // Remove the logo to re-enable sharing
+    const generalInfoSection = page.getByTestId("general-information-section");
+    await generalInfoSection
+      .getByRole("button", { name: "Remove logo" })
+      .click();
+
+    // Verify share button is enabled again after logo removal
+    await expect(shareButton).toHaveAttribute("data-disabled", "false");
+    await expect(shareButton).toBeEnabled();
+  });
+
+  test("switching templates after sharing clears the shared link from the URL", async ({
+    page,
+  }) => {
+    await expect(page).toHaveURL("/");
+
+    const shareButton = page.getByRole("button", { name: "Get link" });
+    const templateSelect = page.getByRole("combobox", {
+      name: "Invoice Template",
+    });
+
+    // The toast actually on screen. The app shows one at a time (`visibleToasts={1}`); the
+    // ones behind it, and one on its way out, are still in the DOM -- and only hidden with
+    // opacity, which `toBeVisible()` does not treat as hidden.
+    const frontToast = page.locator(
+      '[data-sonner-toast][data-front="true"]:not([data-removed="true"])',
+    );
+
+    // Mobile projects share through `navigator.share`, not the clipboard. Keep that share
+    // sheet "open" forever: headless Chrome rejects the call, and the app would then swap the
+    // link's toast for "Failed to share invoice" before the assertion below sees it.
+    await page.evaluate(() => {
+      if (navigator.share) {
+        // A promise that never settles: the user is still looking at the share sheet.
+        const shareSheetLeftOpen = Promise.withResolvers<void>().promise;
+        navigator.share = () => {
+          return shareSheetLeftOpen;
+        };
+      }
+    });
+
+    // Share on the default template...
+    await shareButton.click();
+    await page.waitForURL((url) => {
+      return url.searchParams.has("data");
+    });
+    expect(page.url()).toContain("/?data=");
+
+    // ...then switch to Stripe: the invoice no longer matches the shared link, so `?data=`
+    // has to go. (The template-to-URL sync used to put it back, reading the URL from the
+    // render before the switch.)
+    await templateSelect.selectOption("stripe");
+
+    await expect(page).toHaveURL("/stripe-template");
+    await expect(frontToast).toContainText("Invoice Updated");
+
+    // Same the other way round: share on Stripe, switch back to default. A second round in
+    // one session used to show the stale toasts: "Invoice Updated" stayed in front of the new
+    // link's toast, and then the second "Invoice Updated" never appeared at all.
+    await shareButton.click();
+    await page.waitForURL((url) => {
+      return url.searchParams.has("data");
+    });
+    expect(page.url()).toContain("/stripe-template?data=");
+    // The new link's toast: "...copied to clipboard!" on desktop, "...Share it now." on
+    // mobile. Both carry the same description.
+    await expect(
+      frontToast.getByTestId("share-invoice-link-description-toast"),
+    ).toBeVisible();
+
+    await templateSelect.selectOption("default");
+
+    await expect(page).toHaveURL("/");
+    await expect(frontToast).toContainText("Invoice Updated");
+  });
+
+  test("preserves sharing state after page reload", async ({ page }) => {
+    // Verify default template is selected by default
+    await expect(page).toHaveURL("/");
+
+    // Switch to Stripe template and upload logo
+    await page
+      .getByRole("combobox", { name: "Invoice Template" })
+      .selectOption("stripe");
+
+    await page.waitForURL("/stripe-template");
+
+    // Upload logo
+    await uploadLogoFile(page);
+
+    // Wait for upload and verify share button is disabled
+    const generalInfoSection = page.getByTestId("general-information-section");
+    await expect(
+      generalInfoSection.getByAltText("Company logo preview"),
+    ).toBeVisible();
+
+    const shareButton = page.getByRole("button", {
+      name: "Get link",
+    });
+
+    // Verify share button is disabled
+    await expect(shareButton).toHaveAttribute("data-disabled", "true");
+
+    // Verify the logo is actually saved in localStorage (it is written with a debounce)
+    await expect
+      .poll(async () => {
+        const storedData = await page.evaluate((key) => {
+          return localStorage.getItem(key);
+        }, PDF_DATA_LOCAL_STORAGE_KEY);
+
+        return storedData
+          ? Boolean((JSON.parse(storedData) as InvoiceData).logo)
+          : false;
+      })
+      .toBe(true);
+
+    // Reload the page
+    await page.reload();
+
+    await page.waitForURL("/stripe-template");
+
+    // Verify state persists after reload
+    await expect(
+      page.getByRole("combobox", { name: "Invoice Template" }),
+    ).toHaveValue("stripe");
+    await expect(
+      generalInfoSection.getByAltText("Company logo preview"),
+    ).toBeVisible();
+
+    // Verify share button is still disabled
+    await expect(shareButton).toHaveAttribute("data-disabled", "true");
+  });
+
+  test("sharing functionality works correctly in mobile view (mobile UI is a bit different)", async ({
+    page,
+  }, testInfo) => {
+    // the mobile sharing UI is what this test is about, so we run it on a real
+    // mobile project instead of re-running the same flow on every project
+    // eslint-disable-next-line playwright/no-skipped-test -- mobile UI flow, Mobile Chrome only
+    test.skip(
+      testInfo.project.name !== "Mobile Chrome",
+      "mobile only flow, runs on the Mobile Chrome project",
+    );
+
+    // Verify default template is selected by default
+    await expect(page).toHaveURL("/");
+
+    // Verify share button is visible and enabled in mobile
+    const shareButton = page.getByRole("button", {
+      name: "Get link",
+    });
+    await expect(shareButton).toBeVisible();
+    await expect(shareButton).toBeEnabled();
+
+    // Switch to Stripe template
+    await page
+      .getByRole("combobox", { name: "Invoice Template" })
+      .selectOption("stripe");
+
+    // Upload logo
+    await waitForPdfRegeneration(page, async () => {
+      await uploadLogoFile(page);
+    });
+
+    // Verify share button is disabled in mobile view too
+    await expect(shareButton).toHaveAttribute("data-disabled", "true");
+
+    // Click share button to verify toast is shown
+    await shareButton.click();
+
+    await expect(page.getByText("Unable to Share Invoice")).toBeVisible();
+
+    await expect(
+      page.getByText(
+        "Invoices with logos cannot be shared. Please remove the logo to generate a shareable link. You can still download the invoice as PDF and share it.",
+      ),
+    ).toBeVisible();
+
+    // Remove logo and verify sharing works again
+    const generalInfoSection = page.getByTestId("general-information-section");
+    await generalInfoSection
+      .getByRole("button", { name: "Remove logo" })
+      .click();
+
+    await expect(shareButton).toHaveAttribute("data-disabled", "false");
+    await expect(shareButton).toBeEnabled();
+  });
+
+  test("shows error toast when form has validation errors and generates link after fixing", async ({
+    page,
+  }) => {
+    // Verify default template is selected by default
+    await expect(page).toHaveURL("/");
+
+    // Switch to Stripe template
+    await page
+      .getByRole("combobox", { name: "Invoice Template" })
+      .selectOption("stripe");
+
+    await expect(page).toHaveURL("/stripe-template");
+
+    // Locate the Net Price input for the first invoice item
+    const netPriceInput = page.locator("#itemNetPrice0");
+    await expect(netPriceInput).toBeVisible();
+
+    // Clear the Net Price field to trigger "Net price is required" validation error
+    await netPriceInput.clear();
+
+    // the rendered validation error tells us that the form validation has run
+    await expect(page.getByText("Net price is required")).toBeVisible();
+
+    // Click share button — should show error toast because form has validation errors
+    const shareButton = page.getByRole("button", {
+      name: "Get link",
+    });
+    await shareButton.click();
+
+    // Verify the "Unable to Share Invoice" error toast for form errors is visible
+    await expect(page.getByText("Unable to Share Invoice")).toBeVisible();
+    await expect(
+      page.getByText(
+        "Please fix the errors in the invoice form to generate a shareable link.",
+      ),
+    ).toBeVisible();
+
+    // Fill back the Net Price with a valid value
+    await netPriceInput.fill("100");
+
+    // the validation error disappears once the form is valid again
+    await expect(page.getByText("Net price is required")).toBeHidden();
+
+    // Click share button again — should succeed this time
+    await shareButton.click();
+
+    // Verify the share invoice link description toast appears after generating the link
+    const toast = page.getByTestId("share-invoice-link-description-toast");
+    await expect(toast).toBeVisible();
+
+    await expect(
+      page.getByText(
+        "Share this link to let others view and edit this invoice",
+      ),
+    ).toBeVisible();
+
+    // Verify link was generated: URL should contain data param
+    await page.waitForURL((url) => {
+      return url.searchParams.has("data");
+    });
+    const url = page.url();
+    expect(url).toContain("/stripe-template?data=");
+
+    // Verify data parameter is not empty
+    const urlObj = new URL(url);
+    const dataParam = urlObj.searchParams.get("data");
+    expect(dataParam).toBeTruthy();
+    expect(dataParam).not.toBe("");
+  });
+});

@@ -1,0 +1,85 @@
+import { describe, expect, it } from "vitest";
+
+import { buildHomeJsonLdGraph } from "@/app/(main)/(app)/home-json-ld";
+
+import { JSON_LD_IDS } from "../json-ld-ids";
+
+describe("buildHomeJsonLdGraph", () => {
+  it("includes full WebSite, Organization, WebApplication, and WebPage linked by @id", () => {
+    const graph = buildHomeJsonLdGraph();
+    const serializedGraph = JSON.stringify(graph);
+    const parsed = JSON.parse(serializedGraph) as {
+      "@graph": Array<Record<string, unknown>>;
+    };
+
+    expect(parsed["@graph"]).toHaveLength(4);
+
+    const webSite = parsed["@graph"].find((node) => {
+      return node["@type"] === "WebSite";
+    });
+    const organization = parsed["@graph"].find((node) => {
+      return node["@type"] === "Organization";
+    });
+    const webApplication = parsed["@graph"].find((node) => {
+      return node["@type"] === "WebApplication";
+    });
+    const webPage = parsed["@graph"].find((node) => {
+      return node["@type"] === "WebPage";
+    });
+
+    expect(webSite).toMatchObject({
+      "@id": JSON_LD_IDS.website,
+      publisher: { "@id": JSON_LD_IDS.organization },
+    });
+
+    expect(organization).toMatchObject({
+      "@id": JSON_LD_IDS.organization,
+      name: "Quayside Invoice",
+    });
+
+    expect(webApplication).toMatchObject({
+      "@id": JSON_LD_IDS.app,
+      offers: { price: "0", priceCurrency: "EUR" },
+      creator: { "@id": JSON_LD_IDS.organization },
+      potentialAction: {
+        "@type": "UseAction",
+        name: "Start Invoicing",
+        target: "https://quayside-invoice.example/",
+      },
+    });
+
+    expect(webPage).toMatchObject({
+      "@id": "https://quayside-invoice.example/#webpage",
+      isPartOf: { "@id": JSON_LD_IDS.website },
+      mainEntity: { "@id": JSON_LD_IDS.app },
+    });
+    expect(webPage).not.toHaveProperty("hasPart");
+  });
+
+  it("describes the route it is rendered on in its WebPage node", () => {
+    const stripeTemplatePage = {
+      url: "https://quayside-invoice.example/stripe-template",
+      name: "Stripe Invoice Template - Create Free PDF Invoice",
+      description: "Free Stripe invoice template.",
+    };
+
+    const graph = buildHomeJsonLdGraph(stripeTemplatePage) as unknown as {
+      "@graph": Array<Record<string, unknown>>;
+    };
+
+    const webPages = graph["@graph"].filter((node) => {
+      return node["@type"] === "WebPage";
+    });
+
+    expect(webPages).toEqual([
+      expect.objectContaining({
+        "@id": "https://quayside-invoice.example/stripe-template#webpage",
+        url: stripeTemplatePage.url,
+        name: stripeTemplatePage.name,
+        description: stripeTemplatePage.description,
+        isPartOf: { "@id": JSON_LD_IDS.website },
+        mainEntity: { "@id": JSON_LD_IDS.app },
+      }),
+    ]);
+  });
+});

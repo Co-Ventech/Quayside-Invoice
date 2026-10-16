@@ -1,0 +1,368 @@
+import { useLocale, useTranslations } from "next-intl";
+import Link from "next/link";
+
+import { type HeaderProps, Header } from "@/app/(components)/header";
+import {
+  BlackGoToAppButton,
+  GoToAppButton,
+} from "@/app/(components)/header/go-to-app-button-cta";
+import { ABOUT_FAQ_ITEM_KEYS } from "@/app/[locale]/about/about-faq-item-keys";
+import { AboutFooter } from "@/app/[locale]/about/components/about-footer";
+import { FeaturesCarousel } from "@/app/[locale]/about/components/features-carousel";
+import { GithubStarCtaMarketingPageBody } from "@/app/[locale]/about/components/github-star-cta-body";
+import { HeroDemoVideo } from "@/app/[locale]/about/components/hero-demo-video";
+import { GithubIcon } from "@/components/etc/github-logo";
+import {
+  type RoughAnnotationType,
+  RoughAnnotation,
+} from "@/components/rough-annotation";
+import { Button } from "@/components/ui/button";
+import { FaqAccordion, FaqAccordionItem } from "@/components/ui/faq-accordion";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { GITHUB_URL, MARKETING_FEATURES_CARDS } from "@/config";
+
+// The locale is validated by the `about` layout and resolved from the `[locale]`
+// root param in `src/i18n/request.ts`; the static params live in `src/app/[locale]/layout.tsx`.
+export default function AboutPage() {
+  const locale = useLocale();
+  const t = useTranslations("About");
+
+  const navLinks = {
+    home: t("buttons.home"),
+    features: t("footer.links.features"),
+    faq: "FAQ",
+    github: t("footer.links.github"),
+    githubCTA: t("buttons.starOnGithub"),
+    tagline: t("tagline"),
+  } as const satisfies HeaderProps["translations"]["navLinks"];
+
+  const switchLanguageText = t("buttons.switchLanguage");
+  const goToAppText = t("buttons.goToApp");
+
+  const startInvoicingButtonText = t("buttons.startInvoicing");
+
+  const howItWorksLinkText = t("footer.links.howItWorks");
+  const changelogLinkText = t("footer.links.changelog");
+  const termsOfServiceLinkText = t("footer.links.termsOfService");
+
+  return (
+    <TooltipProvider>
+      <div className="flex min-h-screen flex-col bg-slate-50">
+        <Header
+          locale={locale}
+          // we need to pass the translations to the header to avoid stale translations issue during language switching
+          translations={{
+            navLinks,
+            switchLanguageText,
+            goToAppText,
+            startInvoicingButtonText,
+            howItWorksLinkText,
+            changelogLinkText,
+            termsOfServiceLinkText,
+          }}
+          hideLanguageSwitcher={false}
+        />
+
+        <main>
+          <HeroSection />
+          <FeaturesSection />
+          <div className="flex justify-center py-8 pb-10 lg:py-6 lg:pb-16">
+            <GithubStarCtaMarketingPageBody />
+          </div>
+          <FaqSection />
+          <CtaSection />
+        </main>
+        <AboutFooter />
+      </div>
+    </TooltipProvider>
+  );
+}
+
+/**
+ * HeroSection component
+ *
+ * Renders the hero section of the About page with:
+ * - CTA buttons to start invoicing and view on GitHub
+ * - Video demo of the app
+ * - Localized title and description with hand-drawn marks on its spans, drawn one after another
+ * - Responsive layout (single column on mobile, two columns on XL screens)
+ *
+ */
+function HeroSection() {
+  const t = useTranslations("About");
+
+  return (
+    <section
+      id="hero"
+      className="flex w-full items-center justify-center overflow-hidden bg-gradient-to-b from-white to-slate-50 py-10 md:py-16 xl:py-24"
+    >
+      {/* Background decorative elements */}
+      <div
+        className="pointer-events-none absolute inset-0 overflow-hidden"
+        data-info="background-decorative-elements"
+      >
+        <div className="absolute -right-40 -top-40 h-80 w-80 rounded-full bg-indigo-50/50 blur-3xl" />
+        <div className="absolute bottom-0 left-1/4 h-64 w-64 rounded-full bg-emerald-50/40 blur-3xl" />
+      </div>
+
+      {/* Blur transition overlay between header and hero */}
+      <div
+        data-info="blur-transition-overlay"
+        className="pointer-events-none absolute left-0 right-0 top-[25px] h-32 bg-gradient-to-b from-slate-100 to-slate-50 blur-2xl"
+      />
+
+      <div className="container relative z-10 px-4 md:px-6">
+        <div className="grid gap-6 md:gap-8 lg:gap-12 xl:grid-cols-2 xl:gap-6">
+          {/* Left column start (text and CTA buttons) */}
+          <div className="flex flex-col justify-center space-y-5 md:space-y-6">
+            <div className="space-y-3 md:space-y-4">
+              <h1 className="text-balance text-center text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl md:text-6xl xl:text-left">
+                {t("hero.title")}
+              </h1>
+
+              <div className="flex justify-center xl:justify-start">
+                <p className="text-pretty px-4 text-center text-base text-slate-600 md:max-w-[500px] md:text-lg lg:px-0 xl:text-left xl:text-lg">
+                  {(() => {
+                    let colorIndex = 0;
+
+                    return t.rich("hero.description", {
+                      span: (chunks) => {
+                        // Cycle through the marks: colorIndex increments with each <span>
+                        const mark =
+                          HERO_DESCRIPTION_MARKS[
+                            colorIndex % HERO_DESCRIPTION_MARKS.length
+                          ];
+                        // Each mark starts once the previous one has finished drawing
+                        const delayMs =
+                          HERO_MARKS_START_MS +
+                          colorIndex * HERO_MARK_DURATION_MS;
+                        colorIndex++;
+
+                        return (
+                          <RoughAnnotation
+                            type={mark.type}
+                            color={mark.color}
+                            strokeWidth={mark.strokeWidth}
+                            delayMs={delayMs}
+                            animationDuration={HERO_MARK_DURATION_MS}
+                            className="font-bold text-slate-900"
+                          >
+                            {chunks}
+                          </RoughAnnotation>
+                        );
+                      },
+                    });
+                  })()}
+                </p>
+              </div>
+            </div>
+
+            {/* CTA Buttons (Go to app and GitHub) */}
+            <div className="flex w-full flex-col justify-center gap-3 sm:flex-row sm:flex-wrap xl:justify-start">
+              <BlackGoToAppButton className="w-full px-10 py-6 text-lg lg:w-[270px] lg:max-w-[270px]">
+                <span className="text-clip">{t("buttons.startInvoicing")}</span>
+              </BlackGoToAppButton>
+
+              <Button
+                size="lg"
+                variant="outline"
+                className="group relative w-full overflow-hidden border-slate-200 px-10 py-6 text-lg shadow-sm transition-all duration-300 hover:scale-[1.02] hover:border-slate-300 hover:shadow-md lg:w-[270px] lg:max-w-[270px]"
+                asChild
+              >
+                <Link
+                  href={GITHUB_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <GithubIcon className="mr-2 size-6 transition-all duration-300 group-hover:scale-105" />
+                  <span className="text-clip">{t("buttons.viewOnGithub")}</span>
+                </Link>
+              </Button>
+            </div>
+          </div>
+          {/* Left column end */}
+
+          {/* Right column start (video) */}
+          <div className="relative mx-auto w-full max-w-[950px] xl:mx-0">
+            {/* Mac OS Frame around the video */}
+            <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg md:rounded-2xl md:shadow-xl">
+              {/* Browser chrome bar */}
+              <div className="h-8 w-full rounded-t-xl bg-gradient-to-b from-[#F3F3F3] to-[#E9E9E9] px-4 shadow-sm md:h-12 md:rounded-t-2xl">
+                <div className="flex h-full items-center">
+                  <div className="flex space-x-2">
+                    <div className="h-2.5 w-2.5 rounded-full bg-[#FF5F57] md:h-3 md:w-3"></div>
+                    <div className="h-2.5 w-2.5 rounded-full bg-[#FEBC2E] md:h-3 md:w-3"></div>
+                    <div className="h-2.5 w-2.5 rounded-full bg-[#28C840] md:h-3 md:w-3"></div>
+                  </div>
+                </div>
+              </div>
+              {/* Video container */}
+              <div className="relative aspect-video w-full">
+                <HeroDemoVideo />
+              </div>
+            </div>
+          </div>
+          {/* Right column end */}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FeaturesSection() {
+  const t = useTranslations("About");
+
+  const features = MARKETING_FEATURES_CARDS.map((feature) => {
+    return {
+      translationKey: feature.translationKey,
+      videoSrc: feature.videoSrc,
+      videoFallbackImg: feature.videoFallbackImg,
+      videoDescription: feature.videoDescription,
+      youtubeVideoId: feature.youtubeVideoId,
+      title: t(`features.items.${feature.translationKey}.title`),
+      description: t(`features.items.${feature.translationKey}.description`),
+    };
+  });
+
+  return (
+    <section
+      id="features"
+      className="mt-6 flex w-full items-center justify-center bg-slate-50 py-4 lg:py-8 xl:mt-16 xl:py-16"
+    >
+      <div className="container lg:max-w-[53rem] xl:max-w-[1280px] 2xl:max-w-[1536px]">
+        {/* Features section title and description */}
+        <div className="flex flex-col items-center justify-center space-y-8 px-4 text-center md:px-6">
+          <div className="space-y-5">
+            <h2 className="text-balance text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl md:text-5xl">
+              {t("features.title")}
+            </h2>
+            <p className="mx-auto mt-4 max-w-[700px] text-pretty text-base text-slate-600 sm:text-lg md:text-xl">
+              {t("features.description")}
+            </p>
+          </div>
+          <div
+            className="inline-flex items-center rounded-md border border-amber-200 bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-900 shadow-sm transition-colors"
+            data-testid="features-coming-soon"
+          >
+            {t("features.comingSoon")}
+          </div>
+        </div>
+
+        {/* Features cards */}
+        <FeaturesCarousel
+          features={features}
+          translations={{
+            label: t("features.title"),
+            previousFeature: t("buttons.previousFeature"),
+            nextFeature: t("buttons.nextFeature"),
+          }}
+        />
+      </div>
+    </section>
+  );
+}
+
+function FaqSection() {
+  const t = useTranslations("FAQ");
+
+  return (
+    <section
+      id="faq"
+      className="flex w-full items-center justify-center bg-white py-12 md:py-20"
+    >
+      <div className="container px-4 md:px-6">
+        <div className="flex flex-col items-center justify-center space-y-4 text-center">
+          <div className="space-y-5">
+            <h2 className="text-balance text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl md:text-5xl">
+              {t("title")}
+            </h2>
+            <p className="mx-auto mt-4 max-w-[700px] text-pretty text-base text-slate-600 sm:text-lg md:text-xl">
+              {t("description")}
+            </p>
+          </div>
+        </div>
+        <div className="mx-auto mt-14 max-w-3xl">
+          <FaqAccordion>
+            {ABOUT_FAQ_ITEM_KEYS.map((translationKey) => {
+              return (
+                <FaqAccordionItem
+                  key={translationKey}
+                  question={t(`items.${translationKey}.question`)}
+                  className="border-stone-300 bg-white"
+                >
+                  {t(`items.${translationKey}.answer`)}
+                </FaqAccordionItem>
+              );
+            })}
+          </FaqAccordion>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function CtaSection() {
+  const t = useTranslations("About");
+
+  return (
+    <section
+      id="cta"
+      className="flex w-full items-center justify-center bg-slate-900 py-12 md:py-24 lg:py-32"
+    >
+      <div className="container px-4 md:px-6">
+        <div className="flex flex-col items-center justify-center space-y-7 text-center">
+          <div className="flex flex-col items-center justify-center space-y-2">
+            <h2 className="text-3xl font-bold tracking-tighter text-white md:text-5xl/tight">
+              {t("cta.title")}
+            </h2>
+            <p className="max-w-[600px] text-slate-300 md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
+              {t("cta.description")}
+            </p>
+          </div>
+          <div className="flex w-full flex-col items-center justify-center gap-6">
+            <div className="flex w-full flex-col justify-center gap-2 md:flex-row">
+              <GoToAppButton className="w-full border-slate-600 bg-white px-10 py-6 text-lg text-slate-950 hover:bg-white/90 lg:w-[300px] lg:max-w-[300px]">
+                <span className="text-clip">{t("buttons.goToApp")}</span>
+              </GoToAppButton>
+              <Button
+                size="lg"
+                className="group w-full border border-slate-700 bg-slate-700 px-10 py-6 text-lg text-white transition-all duration-300 hover:bg-slate-600/80 lg:w-[300px] lg:max-w-[300px]"
+                asChild
+              >
+                <Link
+                  href={GITHUB_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <GithubIcon className="mr-2 size-6 fill-slate-100 transition-transform duration-300 group-hover:scale-110 group-hover:fill-slate-200" />
+                  <span className="text-clip">{t("buttons.starOnGithub")}</span>
+                </Link>
+              </Button>
+            </div>
+            <p className="animate-pulse text-sm text-slate-400">
+              {t("cta.noSignup")}
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/** When the first hero mark starts drawing, after the page has settled. */
+const HERO_MARKS_START_MS = 300;
+/** How long each hero mark takes to draw; the next one starts when it ends. */
+const HERO_MARK_DURATION_MS = 700;
+
+/** The marks on the hero description's `<span>`s, in order. */
+const HERO_DESCRIPTION_MARKS = [
+  // yellow-300
+  { type: "highlight", color: "rgb(253 224 71)", strokeWidth: undefined },
+  // red-500
+  { type: "underline", color: "rgb(248 113 113)", strokeWidth: 3 },
+] as const satisfies {
+  type: RoughAnnotationType;
+  color: string;
+  /** Pen width in px; `undefined` keeps the default (a highlight ignores it). */
+  strokeWidth: number | undefined;
+}[];

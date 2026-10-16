@@ -1,0 +1,687 @@
+/* eslint-disable playwright/no-conditional-expect */
+/* eslint-disable playwright/no-conditional-in-test */
+
+import { expect, test } from "@playwright/test";
+
+import { LANGUAGE_TO_NATIVE_LABEL, SUPPORTED_I18N_LOCALES } from "@/app/schema";
+import { GITHUB_URL, TWITTER_URL, VIDEO_DEMO_FALLBACK_IMG } from "@/config";
+
+test.describe("About page", () => {
+  test("should display about page content in English", async ({
+    page,
+    isMobile,
+  }) => {
+    await page.goto("/en/about");
+
+    // Verify the page is loaded
+    await expect(page).toHaveURL("/en/about");
+
+    await expect(page).toHaveTitle(
+      "About EasyInvoicePDF - Free, Open-Source Invoice Generator",
+    );
+
+    const header = page.getByRole("banner");
+
+    /* CHECK HEADER ELEMENTS */
+
+    if (isMobile) {
+      // Mobile: burger button visible, nav links and language switcher hidden in header
+      await expect(
+        header.getByRole("button", { name: "Open menu" }),
+      ).toBeVisible();
+
+      await expect(
+        header.getByRole("button", { name: "Switch language" }),
+      ).toBeHidden();
+
+      await expect(
+        header.getByRole("link", { name: "About Us", exact: true }),
+      ).toBeHidden();
+    } else {
+      // Desktop: nav links and language switcher visible inline, burger button hidden
+      await expect(
+        header.getByRole("button", { name: "Switch language" }),
+      ).toBeVisible();
+
+      const productLink = header.getByRole("link", {
+        name: "About Us",
+        exact: true,
+      });
+
+      await expect(productLink).toBeVisible();
+      await expect(productLink).toHaveAttribute("href", "/en/about");
+
+      const howItWorksLink = header.getByRole("link", {
+        name: "How it works",
+        exact: true,
+      });
+
+      await expect(howItWorksLink).toBeVisible();
+      await expect(howItWorksLink).toHaveAttribute("href", "/how-it-works");
+
+      const githubLink = header.getByRole("link", {
+        name: "GitHub",
+        exact: true,
+      });
+
+      await expect(githubLink).toBeVisible();
+      await expect(githubLink).toHaveAttribute("href", GITHUB_URL);
+
+      // hidden on desktop
+      await expect(
+        header.getByRole("button", { name: "Open menu" }),
+      ).toBeHidden();
+    }
+
+    // check app link button in header
+    await expect(
+      header.getByRole("link", { name: "EasyInvoicePDF" }),
+    ).toBeVisible();
+
+    const goToAppButton = header.getByRole("link", {
+      name: "Open app",
+      exact: true,
+    });
+    await expect(goToAppButton).toBeVisible();
+    await expect(goToAppButton).toHaveAttribute("href", "/");
+
+    // The about page streams behind a `loading.tsx` Suspense boundary. While
+    // React reveals the boundary, the streamed copy of the content is still
+    // sitting in the `<div hidden>` it arrived in, so a bare `#hero` /
+    // `#features` / `#faq` briefly matches two elements and trips strict mode.
+    // Every section below is therefore looked up under the `main` role (a
+    // hidden subtree is not part of the accessibility tree) and filtered to
+    // the visible match, so the streamed copy is never the one we assert on.
+    const main = page.getByRole("main");
+
+    // Check Hero section
+    const heroSection = main.locator("#hero").filter({ visible: true });
+    await expect(heroSection).toBeVisible();
+
+    await expect(
+      heroSection.getByRole("heading", {
+        level: 1,
+        name: "Create professional invoices in seconds",
+        exact: true,
+      }),
+    ).toBeVisible();
+
+    await expect(
+      heroSection.getByText(
+        "A free, open-source invoice generator that runs entirely in your browser. No sign-up, no ads, and your data stays yours.",
+      ),
+    ).toBeVisible();
+
+    const video = heroSection.getByTestId("hero-about-page-video");
+
+    await expect(video).toBeVisible();
+    await expect(video).toHaveAttribute("poster", VIDEO_DEMO_FALLBACK_IMG);
+    await expect(video).toHaveAttribute("loop");
+    await expect(video).toHaveAttribute("playsinline");
+    await expect(video).toHaveAttribute("preload", "metadata");
+
+    // Check Features section
+    const featuresSection = main.locator("#features").filter({ visible: true });
+    await expect(featuresSection).toBeVisible();
+
+    await expect(
+      featuresSection.getByRole("heading", {
+        level: 2,
+        name: "Everything you need for professional invoicing",
+        exact: true,
+      }),
+    ).toBeVisible();
+
+    await expect(
+      featuresSection.getByText(
+        "Create professional invoices with live preview, instant PDF downloads, multi-language support, flexible tax systems and more.",
+      ),
+    ).toBeVisible();
+
+    // check FAQ section
+    const faqSection = main.locator("#faq").filter({ visible: true });
+    await expect(faqSection).toBeVisible();
+
+    await expect(
+      faqSection.getByRole("heading", {
+        level: 2,
+        name: "Frequently Asked Questions",
+        exact: true,
+      }),
+    ).toBeVisible();
+
+    await expect(faqSection.getByText("What is EasyInvoicePDF?")).toBeVisible();
+    await expect(
+      faqSection.getByText("Is EasyInvoicePDF free to use?"),
+    ).toBeVisible();
+
+    // Check footer
+    const footer = page.getByRole("contentinfo");
+    await expect(footer).toBeVisible();
+
+    // check footer social logos first
+    const footerSocialLinks = footer.getByTestId("footer-logos-social-links");
+
+    const githubSocialLink = footerSocialLinks.getByRole("link", {
+      name: "GitHub",
+      exact: true,
+    });
+
+    await expect(githubSocialLink).toBeVisible();
+    await expect(githubSocialLink).toHaveAttribute("href", GITHUB_URL);
+    await expect(githubSocialLink).toHaveAttribute("target", "_blank");
+
+    const twitterSocialLink = footerSocialLinks.getByRole("link", {
+      name: "Twitter",
+      exact: true,
+    });
+
+    await expect(twitterSocialLink).toBeVisible();
+    await expect(twitterSocialLink).toHaveAttribute("href", TWITTER_URL);
+    await expect(twitterSocialLink).toHaveAttribute("target", "_blank");
+
+    // now check all the rest of the footer links
+    const footerLinks = footer.getByTestId("footer-social-links");
+
+    const appLink = footerLinks.getByRole("link", {
+      name: "Invoice Generator",
+      exact: true,
+    });
+
+    await expect(appLink).toBeVisible();
+    await expect(appLink).toHaveAttribute("href", "/");
+    await expect(appLink).not.toHaveAttribute("target", "_blank");
+
+    const featuresLink = footerLinks.getByRole("link", {
+      name: "Features",
+      exact: true,
+    });
+
+    await expect(featuresLink).toBeVisible();
+    await expect(featuresLink).toHaveAttribute("href", "#features");
+    await expect(featuresLink).not.toHaveAttribute("target", "_blank");
+
+    const faqLink = footerLinks.getByRole("link", {
+      name: "FAQ",
+      exact: true,
+    });
+
+    await expect(faqLink).toBeVisible();
+    await expect(faqLink).toHaveAttribute("href", "#faq");
+    await expect(faqLink).not.toHaveAttribute("target", "_blank");
+
+    const changelogLink = footerLinks.getByRole("link", {
+      name: "Changelog",
+      exact: true,
+    });
+
+    await expect(changelogLink).toBeVisible();
+    await expect(changelogLink).toHaveAttribute("href", "/changelog");
+    await expect(changelogLink).not.toHaveAttribute("target", "_blank");
+
+    const howItWorksLink = footerLinks.getByRole("link", {
+      name: "How it works",
+      exact: true,
+    });
+
+    await expect(howItWorksLink).toBeVisible();
+    await expect(howItWorksLink).toHaveAttribute("href", "/how-it-works");
+    await expect(howItWorksLink).not.toHaveAttribute("target", "_blank");
+
+    const founderLink = footerLinks.getByRole("link", {
+      name: "Founder",
+      exact: true,
+    });
+
+    await expect(founderLink).toBeVisible();
+    await expect(founderLink).toHaveAttribute("href", "/founder");
+    await expect(founderLink).not.toHaveAttribute("target", "_blank");
+
+    const termsOfServiceLink = footerLinks.getByRole("link", {
+      name: "Terms of Service",
+      exact: true,
+    });
+
+    await expect(termsOfServiceLink).toBeVisible();
+    await expect(termsOfServiceLink).toHaveAttribute("href", "/tos");
+    await expect(termsOfServiceLink).not.toHaveAttribute("target", "_blank");
+
+    const githubLink = footerLinks.getByRole("link", {
+      name: "GitHub",
+      exact: true,
+    });
+
+    await expect(githubLink).toBeVisible();
+    await expect(githubLink).toHaveAttribute("href", GITHUB_URL);
+    await expect(githubLink).toHaveAttribute("target", "_blank");
+
+    const llmsTxtLink = footerLinks.getByRole("link", {
+      name: "llms.txt",
+      exact: true,
+    });
+
+    await expect(llmsTxtLink).toBeVisible();
+    await expect(llmsTxtLink).toHaveAttribute("href", "/llms.txt");
+
+    await expect(footer.getByText("Made by Vlad Sazonau")).toBeVisible();
+  });
+
+  test("should display about page content in French", async ({ page }) => {
+    await page.goto("/fr/about");
+
+    // Verify the page is loaded with French locale
+    await expect(page).toHaveURL("/fr/about");
+
+    const header = page.getByRole("banner");
+    // Check header elements in French
+    await expect(
+      header.getByRole("link", { name: "EasyInvoicePDF" }),
+    ).toBeVisible();
+
+    const goToAppButton = header.getByRole("link", {
+      name: "Ouvrir",
+      exact: true,
+    });
+    await expect(goToAppButton).toBeVisible();
+
+    const main = page.getByRole("main");
+
+    // Check Hero section in French
+    const heroSection = main.locator("#hero").filter({ visible: true });
+    await expect(heroSection).toBeVisible();
+
+    await expect(
+      heroSection.getByRole("heading", {
+        level: 1,
+        name: "Créez des factures professionnelles en quelques secondes",
+        exact: true,
+      }),
+    ).toBeVisible();
+
+    await expect(
+      heroSection.getByText(
+        "Un générateur de factures gratuit et open-source qui fonctionne entièrement dans votre navigateur. Sans inscription, sans publicité, et vos données restent les vôtres.",
+      ),
+    ).toBeVisible();
+
+    // Check Features section in French
+    const featuresSection = main.locator("#features").filter({ visible: true });
+    await expect(featuresSection).toBeVisible();
+
+    await expect(
+      featuresSection.getByTestId("features-coming-soon"),
+    ).toHaveText("Version Pro et API bientôt disponibles");
+
+    await expect(
+      featuresSection.getByRole("heading", {
+        level: 2,
+        name: "Tout ce dont vous avez besoin pour une facturation professionnelle",
+        exact: true,
+      }),
+    ).toBeVisible();
+
+    // Check footer in French
+    const footer = page.getByRole("contentinfo");
+    await expect(footer).toBeVisible();
+
+    const footerLinks = footer.getByTestId("footer-social-links");
+
+    const appLink = footerLinks.getByRole("link", {
+      name: "Générateur de factures",
+      exact: true,
+    });
+
+    await expect(appLink).toBeVisible();
+    await expect(appLink).toHaveAttribute("href", "/");
+    await expect(appLink).not.toHaveAttribute("target", "_blank");
+
+    const featuresLink = footerLinks.getByRole("link", {
+      name: "Fonctionnalités",
+      exact: true,
+    });
+
+    await expect(featuresLink).toBeVisible();
+    await expect(featuresLink).toHaveAttribute("href", "#features");
+    await expect(featuresLink).not.toHaveAttribute("target", "_blank");
+
+    const termsOfServiceLinkFr = footerLinks.getByRole("link", {
+      name: "Conditions d'utilisation",
+      exact: true,
+    });
+
+    await expect(termsOfServiceLinkFr).toBeVisible();
+    await expect(termsOfServiceLinkFr).toHaveAttribute("href", "/tos");
+    await expect(termsOfServiceLinkFr).not.toHaveAttribute("target", "_blank");
+  });
+
+  test("should display about page content in German", async ({ page }) => {
+    await page.goto("/de/about");
+
+    // Verify the page is loaded with German locale
+    await expect(page).toHaveURL("/de/about");
+
+    const header = page.getByRole("banner");
+    // Check header elements in German
+    await expect(
+      header.getByRole("link", { name: "EasyInvoicePDF" }),
+    ).toBeVisible();
+
+    const goToAppButton = header.getByRole("link", {
+      name: "Öffnen",
+      exact: true,
+    });
+    await expect(goToAppButton).toBeVisible();
+
+    const main = page.getByRole("main");
+
+    // Check Hero section in German
+    const heroSection = main.locator("#hero").filter({ visible: true });
+    await expect(heroSection).toBeVisible();
+
+    await expect(
+      heroSection.getByRole("heading", {
+        level: 1,
+        name: "Erstellen Sie professionelle Rechnungen in Sekunden",
+        exact: true,
+      }),
+    ).toBeVisible();
+
+    await expect(
+      heroSection.getByText(
+        "Ein kostenloser Open-Source-Rechnungsgenerator, der vollständig in Ihrem Browser läuft.",
+      ),
+    ).toBeVisible();
+
+    // Check Features section in German
+    const featuresSection = main.locator("#features").filter({ visible: true });
+    await expect(featuresSection).toBeVisible();
+
+    await expect(
+      featuresSection.getByTestId("features-coming-soon"),
+    ).toHaveText("Pro-Version und API in Kürze verfügbar");
+
+    await expect(
+      featuresSection.getByRole("heading", {
+        level: 2,
+        name: "Alles, was Sie für professionelle Rechnungsstellung brauchen",
+        exact: true,
+      }),
+    ).toBeVisible();
+
+    // Check footer in German
+    const footer = page.getByRole("contentinfo");
+    await expect(footer).toBeVisible();
+
+    const footerLinks = footer.getByTestId("footer-social-links");
+    await expect(
+      footerLinks.getByRole("link", { name: "Funktionen", exact: true }),
+    ).toBeVisible();
+
+    const termsOfServiceLinkDe = footerLinks.getByRole("link", {
+      name: "Nutzungsbedingungen",
+      exact: true,
+    });
+
+    await expect(termsOfServiceLinkDe).toBeVisible();
+    await expect(termsOfServiceLinkDe).toHaveAttribute("href", "/tos");
+    await expect(termsOfServiceLinkDe).not.toHaveAttribute("target", "_blank");
+  });
+
+  test("should handle language switching", async ({ page, isMobile }) => {
+    // Start with English
+    await page.goto("/en/about");
+    await expect(page).toHaveURL("/en/about");
+
+    // On mobile, open the mobile menu first
+    if (isMobile) await page.getByRole("button", { name: "Open menu" }).click();
+
+    // Then switch to French
+    await page
+      .getByRole("button", { name: "Switch language", exact: true })
+      .click();
+    await page.getByRole("menuitem", { name: "Français" }).click();
+
+    await expect(page).toHaveURL("/fr/about");
+
+    const header = page.getByRole("banner");
+
+    await expect(
+      header.getByRole("link", {
+        name: "Ouvrir",
+        exact: true,
+      }),
+    ).toBeVisible();
+  });
+
+  test("should display footer about language links", async ({ page }) => {
+    await page.goto("/en/about");
+
+    const footer = page.getByRole("contentinfo");
+    const footerAboutLinks = footer.getByTestId("footer-about-links");
+
+    await expect(
+      footerAboutLinks.getByRole("heading", {
+        level: 3,
+        name: "About EasyInvoicePDF",
+        exact: true,
+      }),
+    ).toBeVisible();
+
+    for (const lang of SUPPORTED_I18N_LOCALES) {
+      const link = footerAboutLinks.getByRole("link", {
+        name: LANGUAGE_TO_NATIVE_LABEL[lang],
+        exact: true,
+      });
+
+      await expect(link).toBeVisible();
+      await expect(link).toHaveAttribute("href", `/${lang}/about`);
+      await expect(link).not.toHaveAttribute("target", "_blank");
+    }
+  });
+
+  test("should navigate to localized about page from footer language link", async ({
+    page,
+  }) => {
+    await page.goto("/en/about");
+
+    const footerAboutLinks = page
+      .getByRole("contentinfo")
+      .getByTestId("footer-about-links");
+
+    await footerAboutLinks
+      .getByRole("link", { name: "Français", exact: true })
+      .click();
+
+    await expect(page).toHaveURL("/fr/about");
+
+    await expect(
+      page.getByRole("banner").getByRole("link", {
+        name: "Ouvrir",
+        exact: true,
+      }),
+    ).toBeVisible();
+  });
+
+  test("should navigate to app when clicking Go to App button", async ({
+    page,
+  }) => {
+    await page.goto("/en/about");
+    await expect(page).toHaveURL("/en/about");
+
+    // Click the Go to App button in header
+    const header = page.getByRole("banner");
+
+    const headerGoToAppButton = header.getByRole("link", {
+      name: "Open app",
+      exact: true,
+    });
+
+    await headerGoToAppButton.click();
+    await expect(page).toHaveURL("/");
+  });
+
+  // we don't show nav links and language switcher in header on mobile
+  // we test mobile menu separately
+  test("should show desktop nav links in header (ON MOBILE TEST WILL BE SKIPPED)", async ({
+    page,
+    isMobile,
+  }) => {
+    // skip test on mobile
+    // eslint-disable-next-line playwright/no-skipped-test
+    test.skip(isMobile, "Desktop nav only exists on desktop viewport");
+
+    await page.goto("/en/about");
+
+    const header = page.getByRole("banner");
+
+    const productLink = header.getByRole("link", {
+      name: "About Us",
+      exact: true,
+    });
+
+    await expect(productLink).toBeVisible();
+    await expect(productLink).toHaveAttribute("href", "/en/about");
+
+    const howItWorksLink = header.getByRole("link", {
+      name: "How it works",
+      exact: true,
+    });
+    await expect(howItWorksLink).toBeVisible();
+    await expect(howItWorksLink).toHaveAttribute("href", "/how-it-works");
+
+    // changelog lives in the mobile menu only
+    await expect(
+      header.getByRole("link", { name: "Changelog", exact: true }),
+    ).toBeHidden();
+
+    const termsOfServiceLink = header.getByRole("link", {
+      name: "Terms of Service",
+      exact: true,
+    });
+    await expect(termsOfServiceLink).toBeVisible();
+    await expect(termsOfServiceLink).toHaveAttribute("href", "/tos");
+
+    const githubLink = header.getByRole("link", {
+      name: "GitHub",
+      exact: true,
+    });
+    await expect(githubLink).toBeVisible();
+    await expect(githubLink).toHaveAttribute("href", GITHUB_URL);
+
+    // we don't show founder link in header
+    const founderLink = header.getByRole("link", {
+      name: "Founder",
+      exact: true,
+    });
+    await expect(founderLink).toBeHidden();
+
+    const switchLanguageButton = header.getByRole("button", {
+      name: "Switch language",
+    });
+    await expect(switchLanguageButton).toBeVisible();
+
+    // hidden on desktop
+    await expect(
+      header.getByRole("button", { name: "Open menu" }),
+    ).toBeHidden();
+  });
+
+  // we don't show nav links and language switcher in header on mobile
+  // we test desktop nav links separately
+  test("should show mobile menu with nav links and language switcher (ON DESKTOP TEST WILL BE SKIPPED)", async ({
+    page,
+    isMobile,
+  }) => {
+    // skip test on desktop
+    // eslint-disable-next-line playwright/no-skipped-test
+    test.skip(!isMobile, "Mobile menu only exists on mobile viewport");
+
+    await page.goto("/en/about");
+
+    const header = page.getByRole("banner");
+    const burgerButton = header.getByRole("button", { name: "Open menu" });
+
+    // Burger button visible on MOBILE, nav links and language switcher not visible in header
+    await expect(burgerButton).toBeVisible();
+
+    const goToAppButton = header.getByRole("link", {
+      name: "Open app",
+      exact: true,
+    });
+    await expect(goToAppButton).toBeVisible();
+    await expect(goToAppButton).toHaveAttribute("href", "/");
+
+    await expect(
+      header.getByRole("link", { name: "About Us", exact: true }),
+    ).toBeHidden();
+
+    await expect(
+      header.getByRole("button", { name: "Switch language" }),
+    ).toBeHidden();
+
+    // Open the mobile menu
+    await burgerButton.click();
+
+    const sheet = page.getByRole("dialog", { name: "Mobile Menu" });
+
+    const productLink = sheet.getByRole("link", {
+      name: "About Us",
+      exact: true,
+    });
+    await expect(productLink).toBeVisible();
+    await expect(productLink).toHaveAttribute("href", "/en/about");
+
+    const howItWorksLinkMobile = sheet.getByRole("link", {
+      name: "How it works",
+      exact: true,
+    });
+    await expect(howItWorksLinkMobile).toBeVisible();
+    await expect(howItWorksLinkMobile).toHaveAttribute("href", "/how-it-works");
+
+    const changelogLink = sheet.getByRole("link", {
+      name: "Changelog",
+      exact: true,
+    });
+    await expect(changelogLink).toBeVisible();
+    await expect(changelogLink).toHaveAttribute("href", "/changelog");
+
+    const termsLinkMobile = sheet.getByRole("link", {
+      name: "Terms of Service",
+      exact: true,
+    });
+    await expect(termsLinkMobile).toBeVisible();
+    await expect(termsLinkMobile).toHaveAttribute("href", "/tos");
+
+    const githubLink = sheet.getByRole("link", {
+      name: "Star on GitHub",
+      exact: true,
+    });
+    await expect(githubLink).toBeVisible();
+    await expect(githubLink).toHaveAttribute("href", GITHUB_URL);
+
+    // we don't show founder link in mobile menu
+    const founderLinkMobile = sheet.getByRole("link", {
+      name: "Founder",
+      exact: true,
+    });
+    await expect(founderLinkMobile).toBeHidden();
+
+    await expect(
+      sheet.getByRole("button", { name: "Switch language" }),
+    ).toBeVisible();
+
+    // Close the menu and verify burger button is accessible again
+    await page.getByRole("button", { name: "Close menu" }).click();
+    await expect(burgerButton).toBeVisible();
+
+    // Verify mobile menu is closed
+    await expect(
+      page.getByRole("dialog", { name: "Mobile Menu" }),
+    ).toBeHidden();
+
+    // Verify burger button is visible again
+    await expect(
+      header.getByRole("button", { name: "Open menu" }),
+    ).toBeVisible();
+  });
+});

@@ -1,0 +1,30 @@
+"use client";
+
+import { ArrowRightIcon } from "lucide-react";
+import Link from "next/link";
+
+import { Button } from "@/components/ui/button";
+
+export function BlackAnimatedGoToAppBtn({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <Button
+      size="lg"
+      variant="outline"
+      className={
+        "group relative overflow-hidden bg-zinc-900 px-3 text-white transition-all duration-300 hover:scale-[1.02] hover:bg-zinc-800 hover:text-white active:scale-[0.98] sm:px-8"
+      }
+      asChild
+      data-testid="black-animated-go-to-app-btn"
+    >
+      <Link href="/" className="flex items-center">
+        <ArrowRightIcon className="mr-2 size-5 animate-pulse-arrow transition-transform group-hover:scale-110" />
+
+        {children}
+      </Link>
+    </Button>
+  );
+}

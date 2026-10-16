@@ -1,0 +1,83 @@
+import type { Graph } from "schema-dts";
+
+import { PROD_WEBSITE_URL, HOW_IT_WORKS_VIDEOS } from "@/config";
+import { buildBreadcrumbList } from "@/lib/seo/breadcrumb";
+import {
+  JSON_LD_IDS,
+  pageBreadcrumbId,
+  pageWebPageId,
+} from "@/lib/seo/json-ld-ids";
+
+const PAGE_TITLE = "How Quayside Invoice Works | Video Tutorials";
+
+const PAGE_DESCRIPTION =
+  "Watch step-by-step video tutorials on creating invoices, saving seller and buyer details, customizing tax, and generating weekly invoices with Quayside Invoice.";
+
+export function buildHowItWorksJsonLd(baseUrl = PROD_WEBSITE_URL): Graph {
+  const pageUrl = `${baseUrl}/how-it-works`;
+
+  const videoItems = HOW_IT_WORKS_VIDEOS.map((video, index) => {
+    return {
+      "@type": "ListItem" as const,
+      position: index + 1,
+      item: {
+        "@type": "VideoObject" as const,
+        name: video.title,
+        description: video.description,
+        uploadDate: video.uploadDate,
+        duration: toIsoDuration(video.durationSeconds),
+        thumbnailUrl: video.thumbnailUrl,
+        // `embedUrl` alone: `contentUrl` is for the video file's own bytes, which
+        // YouTube never hands out, and the watch page is what it must not be
+        embedUrl: video.embedUrl,
+        url: `${pageUrl}#${video.id}`,
+        publisher: {
+          "@type": "Organization" as const,
+          name: "Quayside Invoice",
+          url: baseUrl,
+        },
+      },
+    };
+  });
+
+  return {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebPage",
+        "@id": pageWebPageId(pageUrl),
+        url: pageUrl,
+        name: PAGE_TITLE,
+        description: PAGE_DESCRIPTION,
+        inLanguage: "en",
+        isPartOf: {
+          "@id": JSON_LD_IDS.website,
+        },
+        breadcrumb: {
+          "@id": pageBreadcrumbId(pageUrl),
+        },
+        mainEntity: {
+          "@type": "ItemList",
+          "@id": `${pageUrl}#tutorials`,
+          name: "Quayside Invoice video tutorials",
+          itemListElement: videoItems,
+        },
+      },
+      buildBreadcrumbList({
+        pageUrl,
+        items: [
+          { name: "Start Invoicing", item: `${baseUrl}/` },
+          { name: "How it works" },
+        ],
+      }),
+    ],
+  };
+}
+
+/** `79` → `"PT1M19S"`, the ISO 8601 form schema.org's `duration` takes. */
+function toIsoDuration(totalSeconds: number) {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  return minutes > 0 ? `PT${minutes}M${seconds}S` : `PT${seconds}S`;
+}

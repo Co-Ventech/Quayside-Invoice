@@ -1,0 +1,28 @@
+import { describe, expect, it } from "vitest";
+
+import { buildFounderJsonLdGraph } from "@/app/(main)/founder/build-founder-json-ld";
+
+import { JSON_LD_IDS } from "../json-ld-ids";
+
+describe("buildFounderJsonLdGraph", () => {
+  it("includes Person entity and ProfilePage with mainEntity pointing to person", () => {
+    const graph = buildFounderJsonLdGraph();
+    const serializedGraph = JSON.stringify(graph);
+    const parsed = JSON.parse(serializedGraph) as {
+      "@graph": Array<Record<string, unknown>>;
+    };
+
+    expect(parsed["@graph"][0]).toMatchObject({
+      "@type": "Person",
+      "@id": JSON_LD_IDS.person,
+      name: "Saltmarsh Coffee Roasters",
+    });
+
+    expect(parsed["@graph"][1]).toMatchObject({
+      "@type": "ProfilePage",
+      "@id": "https://quayside-invoice.example/founder#webpage",
+      isPartOf: { "@id": JSON_LD_IDS.website },
+      mainEntity: { "@id": JSON_LD_IDS.person },
+    });
+  });
+});

@@ -1,0 +1,116 @@
+import type { Metadata } from "next";
+import { hasLocale, type Locale } from "next-intl";
+import { notFound } from "next/navigation";
+import { locale as rootLocale } from "next/root-params";
+
+import { APP_URL, STATIC_ASSETS_URL, TWITTER_CREATOR } from "@/config";
+import { routing } from "@/i18n/routing";
+import {
+  buildHreflangAlternates,
+  OPEN_GRAPH_LOCALE_BY_LOCALE,
+} from "@/lib/seo/locale-utils";
+
+import type EnMessages from "../../../../messages/en.json";
+import { AboutJsonLd } from "./about-json-ld";
+
+// Add metadata to make sure search engines can index the page
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getValidatedLocale();
+
+  try {
+    // Load the messages for the requested locale
+    const messages = await import(`../../../../messages/${locale}.json`).then(
+      (module: { default: typeof EnMessages }) => {
+        return module.default;
+      },
+    );
+
+    return {
+      title: messages.Metadata.about.title,
+      description: messages.Metadata.about.description,
+      keywords: messages.Metadata.about.keywords,
+      alternates: {
+        canonical: `${APP_URL}/${locale}/about`,
+        types: {
+          "text/markdown": `${APP_URL}/${locale}/about.md`,
+        },
+        languages: buildHreflangAlternates("about"),
+      },
+      openGraph: {
+        title: messages.Metadata.about.title,
+        description: messages.Metadata.about.description,
+        siteName: messages.Metadata.about.siteName,
+        locale: OPEN_GRAPH_LOCALE_BY_LOCALE[locale],
+        alternateLocale: Object.values(OPEN_GRAPH_LOCALE_BY_LOCALE),
+        type: "website",
+        url: `${APP_URL}/${locale}/about`,
+        images: [
+          {
+            url: `${STATIC_ASSETS_URL}/easy-invoice-opengraph-image.png?v=1755773879597`,
+            width: 1200,
+            height: 630,
+            type: "image/png",
+            alt: "Quayside Invoice - Free Invoice PDF Generator",
+          },
+        ],
+      },
+      twitter: {
+        card: "summary_large_image",
+        title: messages.Metadata.about.title,
+        description: messages.Metadata.about.description,
+        creator: TWITTER_CREATOR,
+        images: [
+          {
+            url: `${STATIC_ASSETS_URL}/easy-invoice-opengraph-image.png?v=1755773879597`,
+            width: 1200,
+            height: 630,
+            type: "image/png",
+            alt: "Quayside Invoice - Free Invoice PDF Generator",
+          },
+        ],
+      },
+      robots: {
+        index: true,
+        follow: true,
+        googleBot: {
+          index: true,
+          follow: true,
+        },
+      },
+    };
+  } catch (error) {
+    console.error("Error generating metadata:", error);
+
+    throw error;
+  }
+}
+
+export default async function AboutLocaleLayout({
+  children,
+}: LayoutProps<"/[locale]/about">) {
+  const locale = await getValidatedLocale();
+
+  return (
+    <>
+      {/** render the JSON-LD script tag (for SEO) for the about page */}
+      <AboutJsonLd locale={locale} />
+      {children}
+    </>
+  );
+}
+
+/**
+ * The `[locale]` root param matches any single path segment (`/xx/about`), and
+ * `src/i18n/request.ts` maps unknown values to the default locale so the root
+ * layout can still render. Here an unknown value is a 404 instead, rendered by
+ * `src/app/[locale]/not-found.tsx` inside the locale root layout.
+ */
+async function getValidatedLocale(): Promise<Locale> {
+  const requested = await rootLocale();
+
+  if (!hasLocale(routing.locales, requested)) {
+    notFound();
+  }
+
+  return requested;
+}

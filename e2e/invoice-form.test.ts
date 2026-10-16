@@ -1,0 +1,2085 @@
+import { expect, test } from "@playwright/test";
+import dayjs from "dayjs";
+
+import { INVOICE_PDF_TRANSLATIONS } from "@/app/(main)/(app)/pdf-i18n-translations/pdf-translations";
+import {
+  ACCORDION_STATE_LOCAL_STORAGE_KEY,
+  CURRENCY_SYMBOLS,
+  CURRENCY_TO_LABEL,
+  DEFAULT_DATE_FORMAT,
+  getDateFormatsForLanguage,
+  LANGUAGE_TO_LABEL_WITH_REGION,
+  PDF_DATA_LOCAL_STORAGE_KEY,
+  SUPPORTED_CURRENCIES,
+  SUPPORTED_DATE_FORMATS,
+  SUPPORTED_INVOICE_PDF_LANGUAGES,
+  type AccordionState,
+  type InvoiceData,
+} from "@/app/schema";
+import {
+  DISCORD_COMMUNITY_URL,
+  GITHUB_URL,
+  REDDIT_COMMUNITY_URL,
+  STATIC_ASSETS_URL,
+  VIDEO_DEMO_YOUTUBE_URL,
+  YOUTUBE_VIDEO_HOW_TO_ADD_SELLER,
+} from "@/config";
+
+import { INITIAL_INVOICE_DATA } from "../src/app/constants";
+import { expectYouTubeEmbedToShow } from "./utils/youtube-embed";
+
+test.describe("Invoice Generator Page", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/");
+    await expect(page).toHaveURL("/");
+  });
+
+  test("returns permanent redirect from /:locale/app to /", async ({
+    request,
+  }) => {
+    const response = await request.get("/en/app", {
+      maxRedirects: 0, // IMPORTANT
+    });
+
+    // this is a Next.js permanent redirect defined in next.config.mjs
+    expect(response.status()).toBe(308); // Next.js permanent redirect
+    expect(response.statusText()).toBe("Permanent Redirect");
+    // we expect the redirect to the root URL
+    expect(response.headers().location).toBe("/");
+  });
+
+  test("displays correct OG meta tags for default template", async ({
+    page,
+  }) => {
+    await expect(page).toHaveURL("/");
+
+    const templateCombobox = page.getByRole("combobox", {
+      name: "Invoice Template",
+    });
+    await expect(templateCombobox).toHaveValue("default");
+
+    // Check that OG image changed to Stripe template
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute(
+      "content",
+      `${STATIC_ASSETS_URL}/easy-invoice-opengraph-image.png?v=1755773879597`,
+    );
+
+    // Check other meta tags for Stripe template
+    await expect(page.locator('meta[property="og:title"]')).toHaveAttribute(
+      "content",
+      "Free Invoice Generator - Create PDF Invoices Online",
+    );
+    await expect(
+      page.locator('meta[property="og:description"]'),
+    ).toHaveAttribute(
+      "content",
+      "Create professional PDF invoices online for free. Customize invoice templates, add your logo, download instantly, and send invoices without signup.",
+    );
+    await expect(page.locator('meta[property="og:site_name"]')).toHaveAttribute(
+      "content",
+      "EasyInvoicePDF.com | Free Invoice PDF Generator",
+    );
+
+    // Verify OG image dimensions
+    await expect(
+      page.locator('meta[property="og:image:width"]'),
+    ).toHaveAttribute("content", "1200");
+    await expect(
+      page.locator('meta[property="og:image:height"]'),
+    ).toHaveAttribute("content", "630");
+    await expect(page.locator('meta[property="og:image:alt"]')).toHaveAttribute(
+      "content",
+      "Default Invoice Template - EasyInvoicePDF.com",
+    );
+  });
+
+  test("displays correct buttons and links in header", async ({ page }) => {
+    // Check URL is correct
+    await expect(page).toHaveURL("/");
+
+    // Check title and branding
+    await expect(page).toHaveTitle(
+      "Free Invoice Generator - Create PDF Invoices Online",
+    );
+
+    const header = page.getByTestId("header");
+    await expect(header).toBeVisible();
+
+    await expect(
+      header.getByRole("link", { name: "EasyInvoicePDF" }),
+    ).toBeVisible();
+
+    await expect(
+      header.getByText("Free & Open-Source Invoice Generator"),
+    ).toBeVisible();
+
+    // Check main action buttons
+    await expect(page.getByRole("button", { name: "Get link" })).toBeVisible();
+    await expect(
+      page.getByRole("link", {
+        name: /^(Download PDF|Download PDF in .+)$/,
+      }),
+    ).toBeVisible();
+
+    const shareFeedbackLink = header.getByRole("link", {
+      name: "Share your feedback",
+    });
+    await expect(shareFeedbackLink).toBeVisible();
+
+    await expect(shareFeedbackLink).toHaveAttribute(
+      "href",
+      DISCORD_COMMUNITY_URL,
+    );
+    await expect(shareFeedbackLink).toHaveAttribute("target", "_blank");
+
+    const howItWorksButton = header.getByRole("button", {
+      name: "How it works",
+    });
+    await expect(howItWorksButton).toBeVisible();
+    await expect(howItWorksButton).toBeEnabled();
+
+    // open How it works dialog
+    await howItWorksButton.click();
+
+    // Check that demo embed is displayed in dialog
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+
+    const dialogContent = dialog.getByTestId(
+      "how-it-works-videos-dialog-content",
+    );
+    await expect(dialogContent).toBeVisible();
+
+    await expect(
+      dialogContent.getByRole("heading", {
+        name: "How EasyInvoicePDF Works",
+        level: 2,
+      }),
+    ).toBeVisible();
+
+    await expect(
+      dialogContent.getByText(
+        "Learn how to create and customize your invoices.",
+      ),
+    ).toBeVisible();
+
+    const embed = dialogContent.getByTestId("how-it-works-video");
+
+    await expect(embed).toBeVisible();
+
+    await expectYouTubeEmbedToShow({ embed, embedUrl: VIDEO_DEMO_YOUTUBE_URL });
+    await expect(embed).toHaveAttribute("title", "EasyInvoicePDF Demo Video");
+
+    await dialog.getByTestId("how-it-works-playlist-item-add-seller").click();
+    await expectYouTubeEmbedToShow({
+      embed,
+      embedUrl: YOUTUBE_VIDEO_HOW_TO_ADD_SELLER,
+    });
+
+    await expect(
+      dialog.getByRole("heading", { name: "How to add a seller" }),
+    ).toBeVisible();
+
+    const discordLink = dialog.getByTestId("how-it-works-discord");
+    const redditLink = dialog.getByTestId("how-it-works-reddit");
+    await expect(discordLink).toBeVisible();
+    await expect(discordLink).toHaveAttribute("href", DISCORD_COMMUNITY_URL);
+    await expect(redditLink).toBeVisible();
+    await expect(redditLink).toHaveAttribute("href", REDDIT_COMMUNITY_URL);
+
+    await dialog.getByRole("button", { name: "Close" }).click();
+    await expect(dialog).toBeHidden();
+
+    await expect(
+      dialog.getByRole("heading", { name: "How EasyInvoicePDF Works" }),
+    ).toBeHidden();
+
+    // Verify GitHub Star CTA button is visible
+    const githubStarCtaButton = page.getByRole("link", {
+      name: "Star project on GitHub",
+      exact: true,
+    });
+
+    await expect(githubStarCtaButton).toBeVisible();
+    await expect(githubStarCtaButton).toHaveAttribute("href", GITHUB_URL);
+    await expect(githubStarCtaButton).toHaveAttribute("target", "_blank");
+
+    // Verify buttons are enabled
+    await expect(page.getByRole("button", { name: "Get link" })).toBeEnabled();
+    await expect(
+      page.getByRole("link", {
+        name: /^(Download PDF|Download PDF in .+)$/,
+      }),
+    ).toBeEnabled();
+  });
+
+  test(
+    "handles mobile/desktop views",
+    {
+      // the `useIsDesktop` matchMedia listener swapping the mobile tabs for the
+      // desktop layout, and `src/hooks/use-media-query.tsx` carries a Safari
+      // specific fallback, so this runs on desktop WebKit too
+      tag: "@webkit-desktop-smoke",
+    },
+    async ({ page }) => {
+      // Test mobile view
+      await page.setViewportSize({ width: 375, height: 667 });
+
+      // check that tabs are visible in mobile view
+      await expect(
+        page.getByRole("tab", { name: "Edit Invoice" }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("tab", { name: "Preview PDF" }),
+      ).toBeVisible();
+
+      const termsOfServiceMobile = page.getByTestId(
+        "mobile-terms-of-service-link",
+      );
+      const termsOfServiceLinkMobile = termsOfServiceMobile.getByRole("link");
+
+      // Check that Terms of Service are displayed
+      await expect(termsOfServiceMobile).toBeVisible();
+      await expect(termsOfServiceMobile).toHaveText(
+        "By using this tool, you agree to the Terms of Service",
+      );
+      await expect(termsOfServiceLinkMobile).toHaveAttribute("href", "/tos");
+
+      // Test desktop view
+      await page.setViewportSize({ width: 1280, height: 800 });
+
+      // check that tabs are not visible in desktop view
+      await expect(
+        page.getByRole("tab", { name: "Edit Invoice" }),
+      ).toBeHidden();
+      await expect(page.getByRole("tab", { name: "Preview PDF" })).toBeHidden();
+
+      const termsOfServiceDesktop = page.getByTestId(
+        "desktop-terms-of-service-link",
+      );
+      const termsOfServiceLinkDesktop = termsOfServiceDesktop.getByRole("link");
+
+      // Check that Terms of Service are displayed
+      await expect(termsOfServiceDesktop).toBeVisible();
+      await expect(termsOfServiceDesktop).toHaveText(
+        "By using this tool, you agree to the Terms of Service",
+      );
+      await expect(termsOfServiceLinkDesktop).toHaveAttribute("href", "/tos");
+    },
+  );
+
+  test("keeps a form edit made right before switching to the preview tab", async ({
+    page,
+    isMobile,
+  }) => {
+    // the tabs only exist in the mobile layout
+    // eslint-disable-next-line playwright/no-skipped-test -- mobile UI flow, mobile projects only
+    test.skip(!isMobile, "mobile only flow, runs on the mobile projects");
+
+    const NEW_INVOICE_NUMBER = "QUICK-TAB-SWITCH/2026";
+
+    const invoiceNumberValueInput = page
+      .getByRole("group", { name: "Invoice Number" })
+      .getByRole("textbox", { name: "Value" });
+
+    await expect(invoiceNumberValueInput).toHaveValue(
+      INITIAL_INVOICE_DATA.invoiceNumberObject.value,
+    );
+
+    // The form saves itself to localStorage (and regenerates the PDF) on a debounce, so
+    // leaving the tab right after typing used to unmount the form mid debounce and drop
+    // the edit. No wait between the two actions on purpose: the switch has to happen
+    // inside the debounce window for this to test anything.
+    await invoiceNumberValueInput.fill(NEW_INVOICE_NUMBER);
+    await page.getByRole("tab", { name: "Preview PDF" }).click();
+
+    await expect(
+      page.getByRole("tab", { name: "Preview PDF" }),
+    ).toHaveAttribute("aria-selected", "true");
+
+    // the pending save still lands, even though the form tab is closed by now
+    await expect
+      .poll(async () => {
+        const storedData = await page.evaluate((key) => {
+          return localStorage.getItem(key);
+        }, PDF_DATA_LOCAL_STORAGE_KEY);
+
+        return storedData
+          ? (JSON.parse(storedData) as InvoiceData).invoiceNumberObject?.value
+          : null;
+      })
+      .toBe(NEW_INVOICE_NUMBER);
+
+    // and the edit is still there when the user comes back to the form
+    await page.getByRole("tab", { name: "Edit Invoice" }).click();
+
+    await expect(invoiceNumberValueInput).toHaveValue(NEW_INVOICE_NUMBER);
+  });
+
+  test("commits a pending form edit when leaving the form tab", async ({
+    page,
+    isMobile,
+  }) => {
+    // the tabs only exist in the mobile layout
+    // eslint-disable-next-line playwright/no-skipped-test -- mobile UI flow, mobile projects only
+    test.skip(!isMobile, "mobile only flow, runs on the mobile projects");
+
+    const NEW_INVOICE_NUMBER = "FLUSHED-ON-TAB-SWITCH/2026";
+
+    const readStoredInvoice = () => {
+      return page.evaluate((key) => {
+        return String(localStorage.getItem(key));
+      }, PDF_DATA_LOCAL_STORAGE_KEY);
+    };
+
+    // Pausing the clock takes the 500ms debounce out of the picture entirely: it can no
+    // longer fire on its own, so anything that reaches localStorage below got there
+    // because leaving the form tab flushed it. `install()` alone is not enough, the fake
+    // clock keeps ticking until it is paused.
+    await page.clock.install();
+    await page.goto("/");
+
+    // pause ahead of where the page's fake clock already is: `pauseAt` fast forwards to
+    // the given time and rejects a target that is already in the past, so the margin has
+    // to outlast the round trip that reads the clock (100ms did not, once the suite ran
+    // its workers in parallel). It also has to stay under the app's own idle timers, so
+    // the jump does not fire them - the earliest of those is the changelog popup at
+    // 1500ms.
+    const CLOCK_PAUSE_MARGIN = 1000;
+
+    const pageTime = await page.evaluate(() => {
+      return Date.now();
+    });
+
+    await page.clock.pauseAt(new Date(pageTime + CLOCK_PAUSE_MARGIN));
+
+    const invoiceNumberValueInput = page
+      .getByRole("group", { name: "Invoice Number" })
+      .getByRole("textbox", { name: "Value" });
+
+    await invoiceNumberValueInput.fill(NEW_INVOICE_NUMBER);
+
+    // the debounce is frozen, so nothing has been written yet
+    expect(await readStoredInvoice()).not.toContain(NEW_INVOICE_NUMBER);
+
+    await page.getByRole("tab", { name: "Preview PDF" }).click();
+
+    // ...and switching tabs commits it right away instead of waiting out the debounce
+    await expect.poll(readStoredInvoice).toContain(NEW_INVOICE_NUMBER);
+  });
+
+  test("displays initial form state correctly", async ({ page }) => {
+    // **CHECK GENERAL INFORMATION SECTION**
+    const generalInfoSection = page.getByTestId(`general-information-section`);
+    await expect(
+      generalInfoSection.getByText("General Information", { exact: true }),
+    ).toBeVisible();
+
+    // Check all supported languages are available as options with correct labels
+    const languageSelect = generalInfoSection.getByRole("combobox", {
+      name: "Invoice PDF Language",
+    });
+
+    // Language selection
+    await expect(languageSelect).toHaveValue(INITIAL_INVOICE_DATA.language);
+
+    // Verify all supported languages are available as options with correct labels
+    for (const lang of SUPPORTED_INVOICE_PDF_LANGUAGES) {
+      const languageName = LANGUAGE_TO_LABEL_WITH_REGION[lang];
+
+      await expect(
+        languageSelect.locator(`option[value="${lang}"]`),
+      ).toHaveText(languageName);
+    }
+
+    // Currency selection (combobox with popover)
+    const currencyCombobox = generalInfoSection.getByRole("combobox", {
+      name: "Currency",
+    });
+
+    const defaultCurrency = INITIAL_INVOICE_DATA.currency;
+    const defaultCurrencyLabel =
+      `${defaultCurrency} ${CURRENCY_SYMBOLS[defaultCurrency]} ${CURRENCY_TO_LABEL[defaultCurrency]}`.trim();
+    await expect(currencyCombobox).toContainText(defaultCurrencyLabel);
+
+    // check that value is saved in the hidden input
+    await expect(page.locator('input[name="currency"]')).toHaveValue(
+      INITIAL_INVOICE_DATA.currency,
+    );
+
+    // Open the combobox to verify all supported currencies are listed
+    await currencyCombobox.click();
+
+    for (const currency of SUPPORTED_CURRENCIES) {
+      const currencySymbol = CURRENCY_SYMBOLS[currency];
+      const currencyFullName = CURRENCY_TO_LABEL[currency];
+
+      const expectedLabel =
+        `${currency} ${currencySymbol} ${currencyFullName}`.trim();
+
+      await expect(
+        page.getByRole("option", { name: expectedLabel }),
+      ).toBeVisible();
+    }
+
+    // Close the combobox
+    await currencyCombobox.click();
+
+    // Date Format selection
+    const dateFormatSelect = generalInfoSection.getByRole("combobox", {
+      name: "Date Format",
+    });
+
+    await expect(dateFormatSelect).toHaveValue(INITIAL_INVOICE_DATA.dateFormat);
+
+    // Verify the date formats offered in the initial language are listed with correct
+    // labels. The list is per language: the formats carrying another language's
+    // punctuation ("17. Dezember", "17 de diciembre de", "2025 г.") are left out of
+    // the rest.
+    const offeredDateFormats = getDateFormatsForLanguage(
+      INITIAL_INVOICE_DATA.language,
+    );
+
+    for (const dateFormat of offeredDateFormats) {
+      const preview = dayjs().format(dateFormat);
+      const isDefault = dateFormat === DEFAULT_DATE_FORMAT;
+
+      await expect(
+        dateFormatSelect.locator(`option[value="${dateFormat}"]`),
+      ).toHaveText(
+        `${dateFormat} (${preview}) ${isDefault ? "(default)" : ""}`,
+      );
+    }
+
+    // and the ones that belong to another language are not offered at all
+    const notOfferedDateFormats = SUPPORTED_DATE_FORMATS.filter(
+      (dateFormat) => {
+        return !offeredDateFormats.includes(dateFormat);
+      },
+    );
+
+    expect(notOfferedDateFormats).toEqual([
+      "D. MMMM YYYY",
+      "D [de] MMMM [de] YYYY",
+      "D MMMM YYYY [г.]",
+      "D MMMM YYYY [р.]",
+    ]);
+
+    for (const dateFormat of notOfferedDateFormats) {
+      await expect(
+        dateFormatSelect.locator(`option[value="${dateFormat}"]`),
+      ).toHaveCount(0);
+    }
+
+    // Invoice Number
+    const invoiceNumberFieldset = page.getByRole("group", {
+      name: "Invoice Number",
+    });
+
+    await expect(
+      invoiceNumberFieldset.getByRole("textbox", { name: "Label" }),
+    ).toHaveValue(INITIAL_INVOICE_DATA.invoiceNumberObject.label);
+
+    await expect(
+      invoiceNumberFieldset.getByRole("textbox", { name: "Value" }),
+    ).toHaveValue(INITIAL_INVOICE_DATA.invoiceNumberObject.value);
+
+    // Date of Issue
+    await expect(
+      generalInfoSection.getByRole("textbox", { name: "Date of Issue" }),
+    ).toHaveValue(INITIAL_INVOICE_DATA.dateOfIssue);
+
+    // Service period
+    const servicePeriodFieldset = generalInfoSection.getByRole("group", {
+      name: "Service period",
+    });
+
+    await expect(servicePeriodFieldset).toBeVisible();
+
+    await expect(
+      servicePeriodFieldset.getByRole("textbox", {
+        name: "Service period PDF label",
+      }),
+    ).toHaveValue(INITIAL_INVOICE_DATA.servicePeriodLabelText);
+
+    await expect(
+      servicePeriodFieldset.getByRole("textbox", {
+        name: "Date of sales PDF label",
+      }),
+    ).toHaveValue(INITIAL_INVOICE_DATA.dateOfServiceLabelText);
+
+    await expect(
+      servicePeriodFieldset.getByRole("textbox", {
+        name: "Service period start",
+      }),
+    ).toHaveValue(INITIAL_INVOICE_DATA.dateOfServiceStart);
+
+    await expect(
+      servicePeriodFieldset.getByRole("textbox", {
+        name: "Service period end",
+      }),
+    ).toHaveValue(INITIAL_INVOICE_DATA.dateOfService);
+
+    // Check that info icon is visible
+    await expect(
+      servicePeriodFieldset.getByTestId("service-period-end-info-icon"),
+    ).toBeVisible();
+
+    await expect(
+      servicePeriodFieldset.getByRole("switch", {
+        name: 'Show the "Service period" (Service period start and end) field in the PDF',
+      }),
+    ).not.toBeChecked();
+
+    // by default, date of sales is visible in PDF
+    const dateOfServiceSwitch = servicePeriodFieldset.getByRole("switch", {
+      name: 'Show the "Date of sales/of executing the service" field in the PDF',
+    });
+
+    await expect(dateOfServiceSwitch).toBeChecked();
+    await dateOfServiceSwitch.click();
+    await expect(dateOfServiceSwitch).not.toBeChecked();
+
+    await expect(
+      servicePeriodFieldset.getByRole("textbox", {
+        name: "Service period end",
+      }),
+    ).toBeEditable();
+
+    await expect(
+      servicePeriodFieldset.getByRole("button", {
+        name: 'Shown on PDF as part of "Service period" and as "Date of sales/of executing the service"',
+      }),
+    ).toBeVisible();
+
+    // Invoice Type
+    await expect(
+      generalInfoSection.getByRole("textbox", { name: "Header Notes" }),
+    ).toHaveValue(INITIAL_INVOICE_DATA.invoiceType);
+
+    // Visibility toggles
+    await expect(
+      generalInfoSection.getByRole("switch", {
+        name: `Show the "Header Notes" Field in the PDF`,
+      }),
+    ).toBeChecked();
+
+    // **CHECK SELLER INFORMATION SECTION**
+    const sellerSection = page.getByTestId(`seller-information-section`);
+    await expect(
+      sellerSection.getByText("Seller Information", { exact: true }),
+    ).toBeVisible();
+
+    // Name field
+    await expect(
+      sellerSection.getByRole("textbox", { name: "Name" }),
+    ).toHaveValue(INITIAL_INVOICE_DATA.seller.name);
+
+    // Address field
+    await expect(
+      sellerSection.getByRole("textbox", { name: "Address" }),
+    ).toHaveValue(INITIAL_INVOICE_DATA.seller.address);
+
+    // Tax Number field and visibility toggle
+    const sellerVatFieldset = sellerSection.getByRole("group", {
+      name: "Tax Number",
+    });
+    await expect(
+      sellerVatFieldset.getByRole("textbox", { name: "Value" }),
+    ).toHaveValue(INITIAL_INVOICE_DATA.seller.vatNo);
+
+    await expect(
+      sellerSection.getByRole("switch", {
+        name: `Show the 'Seller Tax Number' Field in the PDF`,
+      }),
+    ).toBeChecked();
+
+    // Email field
+    await expect(
+      sellerSection.getByRole("textbox", { name: "Email" }),
+    ).toHaveValue(INITIAL_INVOICE_DATA.seller.email);
+
+    // Account Number field and visibility toggle
+    await expect(
+      sellerSection.getByRole("textbox", { name: "Account Number" }),
+    ).toHaveValue(INITIAL_INVOICE_DATA.seller.accountNumber);
+
+    await expect(
+      sellerSection.getByRole("switch", {
+        name: `Show the 'Account Number' Field in the PDF`,
+      }),
+    ).toBeChecked();
+
+    // SWIFT/BIC field and visibility toggle
+    await expect(
+      sellerSection.getByRole("textbox", { name: "SWIFT/BIC" }),
+    ).toHaveValue(INITIAL_INVOICE_DATA.seller.swiftBic);
+
+    await expect(
+      sellerSection.getByRole("switch", {
+        name: `Show the 'SWIFT/BIC' Field in the PDF`,
+      }),
+    ).toBeChecked();
+
+    // Verify Seller Management button is present
+    await expect(
+      sellerSection.getByRole("button", { name: "New Seller" }),
+    ).toBeVisible();
+
+    // **CHECK BUYER INFORMATION SECTION**
+    const buyerSection = page.getByTestId(`buyer-information-section`);
+    await expect(
+      buyerSection.getByText("Buyer Information", { exact: true }),
+    ).toBeVisible();
+
+    // Name field
+    await expect(
+      buyerSection.getByRole("textbox", { name: "Name" }),
+    ).toHaveValue(INITIAL_INVOICE_DATA.buyer.name);
+
+    // Address field
+    await expect(
+      buyerSection.getByRole("textbox", { name: "Address" }),
+    ).toHaveValue(INITIAL_INVOICE_DATA.buyer.address);
+
+    // Tax Number field and visibility toggle
+    const buyerVatFieldset = buyerSection.getByRole("group", {
+      name: "Tax Number",
+    });
+    await expect(
+      buyerVatFieldset.getByRole("textbox", { name: "Value" }),
+    ).toHaveValue(INITIAL_INVOICE_DATA.buyer.vatNo);
+
+    const buyerVatNoFieldIsVisibleSwitch = buyerSection.getByTestId(
+      `buyerVatNoFieldIsVisible`,
+    );
+
+    await expect(buyerVatNoFieldIsVisibleSwitch).toHaveRole("switch");
+    await expect(buyerVatNoFieldIsVisibleSwitch).toBeChecked();
+
+    // Email field
+    await expect(
+      buyerSection.getByRole("textbox", { name: "Email" }),
+    ).toHaveValue(INITIAL_INVOICE_DATA.buyer.email);
+
+    // Verify Buyer Management button is present
+    await expect(
+      buyerSection.getByRole("button", { name: "New Buyer" }),
+    ).toBeVisible();
+
+    // **Check INVOICE ITEMS section**
+    const invoiceItemsSection = page.getByTestId(`invoice-items-section`);
+    await expect(
+      invoiceItemsSection.getByText("Items and pricing", { exact: true }),
+    ).toBeVisible();
+
+    // Check visibility toggles in settings
+    await expect(
+      invoiceItemsSection.getByRole("switch", {
+        name: /Show "Number" Column/i,
+      }),
+    ).toBeChecked();
+
+    await expect(
+      invoiceItemsSection.getByRole("switch", {
+        name: /Show "VAT Table Summary"/i,
+      }),
+    ).toBeChecked();
+
+    // Check first invoice item fields
+    const firstItem = INITIAL_INVOICE_DATA.items[0];
+
+    // Name field and visibility toggle
+    await expect(
+      invoiceItemsSection.getByRole("textbox", { name: "Name" }),
+    ).toHaveValue(firstItem.name);
+    await expect(
+      invoiceItemsSection.getByRole("switch", {
+        name: "Show the 'Name of Goods/Service' Column in the PDF for item 1",
+      }),
+    ).toBeChecked();
+
+    // Type of GTU field and visibility toggle
+    await expect(
+      invoiceItemsSection.getByRole("textbox", { name: "Type of GTU" }),
+    ).toHaveValue(firstItem.typeOfGTU);
+    await expect(
+      invoiceItemsSection.getByRole("switch", {
+        name: "Show the 'Type of GTU' Column in the PDF for item 1",
+      }),
+    ).not.toBeChecked(); // we don't want to show this in PDF by default
+
+    // Amount field and visibility toggle
+    await expect(
+      invoiceItemsSection.getByRole("spinbutton", {
+        name: "Amount (Quantity)",
+      }),
+    ).toHaveValue(firstItem.amount.toString());
+    await expect(
+      invoiceItemsSection.getByRole("switch", {
+        name: "Show the 'Amount' Column in the PDF for item 1",
+      }),
+    ).toBeChecked();
+
+    // Unit field and visibility toggle
+    await expect(
+      invoiceItemsSection.getByRole("textbox", { name: "Unit" }),
+    ).toHaveValue(firstItem.unit);
+    await expect(
+      invoiceItemsSection.getByRole("switch", {
+        name: "Show the 'Unit' Column in the PDF for item 1",
+      }),
+    ).toBeChecked();
+
+    // Net Price field and visibility toggle
+    await expect(
+      invoiceItemsSection.getByRole("spinbutton", {
+        name: "Net Price (Rate or Unit Price)",
+      }),
+    ).toHaveValue(firstItem.netPrice.toString());
+    await expect(
+      invoiceItemsSection.getByRole("switch", {
+        name: "Show the 'Net Price' Column in the PDF for item 1",
+      }),
+    ).toBeChecked();
+
+    // VAT field and visibility toggle
+    await expect(
+      invoiceItemsSection.getByRole("textbox", {
+        name: "VAT Rate",
+        exact: true,
+      }),
+    ).toHaveValue(firstItem.vat);
+    await expect(
+      invoiceItemsSection.getByRole("switch", {
+        name: "Show the 'VAT' Column in the PDF for item 1",
+      }),
+    ).toBeChecked();
+
+    // Verify VAT helper text is displayed
+    await expect(
+      invoiceItemsSection
+        .getByTestId(`itemVat0`)
+        .getByText("Enter a number (0-100) or text (e.g., NP, OO, etc)."),
+    ).toBeVisible();
+
+    // Net Amount field (read-only) and visibility toggle
+    await expect(
+      invoiceItemsSection.getByRole("textbox", {
+        name: "Net Amount",
+        exact: true,
+      }),
+    ).toHaveValue(
+      firstItem.netAmount.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }),
+    );
+    await expect(
+      invoiceItemsSection.getByRole("switch", {
+        name: "Show the 'Net Amount' Column in the PDF for item 1",
+      }),
+    ).toBeChecked();
+
+    // VAT Amount field (read-only) and visibility toggle
+    await expect(
+      invoiceItemsSection.getByRole("textbox", {
+        name: "VAT Amount",
+        exact: true,
+      }),
+    ).toHaveValue(
+      firstItem.vatAmount.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }),
+    );
+    await expect(
+      invoiceItemsSection.getByRole("switch", {
+        name: "Show the 'VAT Amount' Column in the PDF for item 1",
+      }),
+    ).toBeChecked();
+
+    // Pre-tax Amount field (read-only) and visibility toggle
+    await expect(
+      invoiceItemsSection.getByRole("textbox", {
+        name: "Pre-tax Amount",
+        exact: true,
+      }),
+    ).toHaveValue(
+      firstItem.preTaxAmount.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }),
+    );
+    await expect(
+      invoiceItemsSection.getByRole("switch", {
+        name: "Show the 'Pre-tax Amount' Column in the PDF for item 1",
+      }),
+    ).toBeChecked();
+
+    // Verify Add Invoice Item button is present
+    await expect(
+      invoiceItemsSection.getByRole("button", { name: "Add invoice item" }),
+    ).toBeVisible();
+  });
+
+  test("updates service period PDF labels on language change and allows customization", async ({
+    page,
+  }) => {
+    const generalInfoSection = page.getByTestId("general-information-section");
+    const servicePeriodFieldset = generalInfoSection.getByRole("group", {
+      name: "Service period",
+    });
+
+    const servicePeriodLabelInput = servicePeriodFieldset.getByRole("textbox", {
+      name: "Service period PDF label",
+    });
+    const dateOfServiceLabelInput = servicePeriodFieldset.getByRole("textbox", {
+      name: "Date of sales PDF label",
+    });
+
+    await servicePeriodLabelInput.fill("Custom service period label");
+    await dateOfServiceLabelInput.fill("Custom date of sales label");
+
+    const languageSelect = generalInfoSection.getByRole("combobox", {
+      name: "Invoice PDF Language",
+    });
+    await languageSelect.selectOption("pl");
+
+    await expect(servicePeriodLabelInput).toHaveValue(
+      INVOICE_PDF_TRANSLATIONS.pl.servicePeriod,
+    );
+    await expect(dateOfServiceLabelInput).toHaveValue(
+      INVOICE_PDF_TRANSLATIONS.pl.dateOfService,
+    );
+
+    await servicePeriodLabelInput.fill("My custom period");
+    await expect(
+      servicePeriodFieldset.getByRole("button", {
+        name: `Reset to default ("${INVOICE_PDF_TRANSLATIONS.pl.servicePeriod}")`,
+      }),
+    ).toBeVisible();
+
+    await servicePeriodFieldset
+      .getByRole("button", {
+        name: `Reset to default ("${INVOICE_PDF_TRANSLATIONS.pl.servicePeriod}")`,
+      })
+      .click();
+
+    await expect(servicePeriodLabelInput).toHaveValue(
+      INVOICE_PDF_TRANSLATIONS.pl.servicePeriod,
+    );
+  });
+
+  test("can add and remove invoice items and recalculates totals correctly", async ({
+    page,
+  }) => {
+    const invoiceItemsSection = page.getByTestId(`invoice-items-section`);
+
+    // Add new invoice item
+    await invoiceItemsSection
+      .getByRole("button", { name: "Add invoice item" })
+      .click();
+    await expect(
+      invoiceItemsSection.getByText("Item 2", { exact: true }),
+    ).toBeVisible();
+
+    // Fill in new invoice item details
+    const itemNameInput = invoiceItemsSection
+      .getByRole("textbox", { name: "Name" })
+      .nth(1);
+
+    await itemNameInput.fill("TEST INVOICE ITEM");
+    await expect(itemNameInput).toHaveValue("TEST INVOICE ITEM");
+
+    const finalSection = page.getByTestId(`final-section`);
+
+    // Fill in net price for Item 1 (5000)
+    await invoiceItemsSection
+      .getByRole("spinbutton", {
+        name: "Net Price (Rate or Unit Price)",
+        exact: true,
+      })
+      .nth(0)
+      .fill("5000");
+
+    // Verify total reflects Item 1 only (1 * 5000 = 5000, vat is "NP")
+    await expect(
+      finalSection.getByRole("textbox", { name: "Total", exact: true }),
+    ).toHaveValue("5,000.00");
+
+    // Fill in amount and net price for Item 2 (3 * 10000 = 30000)
+    await invoiceItemsSection
+      .getByRole("spinbutton", { name: "Amount (Quantity)", exact: true })
+      .nth(1)
+      .fill("3");
+    await invoiceItemsSection
+      .getByRole("spinbutton", {
+        name: "Net Price (Rate or Unit Price)",
+        exact: true,
+      })
+      .nth(1)
+      .fill("10000");
+
+    // Verify total is updated (5000 + 3*10000 = 35000, vat is "NP" so no tax)
+    await expect(
+      finalSection.getByRole("textbox", { name: "Total", exact: true }),
+    ).toHaveValue("35,000.00");
+
+    // Click delete button to open confirmation dialog
+    await invoiceItemsSection
+      .getByRole("button", { name: "Delete Invoice Item 2" })
+      .click();
+
+    // Verify confirmation dialog appears
+    await expect(
+      page.getByTestId("delete-invoice-item-confirmation-dialog"),
+    ).toBeVisible();
+
+    await expect(
+      page.getByRole("alertdialog", { name: "Delete Item 2?" }),
+    ).toBeVisible();
+
+    await expect(
+      page.getByText(
+        '"TEST INVOICE ITEM" will be removed from this invoice, and the totals recalculated.',
+      ),
+    ).toBeVisible();
+
+    // --- Test cancel flow first ---
+
+    // Click cancel button in dialog
+    await page.getByRole("button", { name: "Cancel" }).click();
+
+    // Dialog should disappear
+    await expect(
+      page.getByTestId("delete-invoice-item-confirmation-dialog"),
+    ).toBeHidden();
+
+    await expect(
+      page.getByRole("alertdialog", { name: "Delete Item 2?" }),
+    ).toBeHidden();
+
+    // Item should still be present
+    await expect(
+      invoiceItemsSection.getByText("Item 2", { exact: true }),
+    ).toBeVisible();
+
+    // Cancelling puts focus back on the button that opened the dialog
+    await expect(
+      invoiceItemsSection.getByRole("button", {
+        name: "Delete Invoice Item 2",
+      }),
+    ).toBeFocused();
+
+    // --- Now confirm deletion flow ---
+
+    // Open the dialog again
+    await invoiceItemsSection
+      .getByRole("button", { name: "Delete Invoice Item 2" })
+      .click();
+
+    await expect(
+      page.getByTestId("delete-invoice-item-confirmation-dialog"),
+    ).toBeVisible();
+
+    // Confirm deletion
+    await page.getByRole("button", { name: "Delete Item 2" }).click();
+
+    // Verify success message
+    await expect(
+      page.getByText("Invoice item removed successfully", { exact: true }),
+    ).toBeVisible();
+
+    // The field that had focus was inside the deleted item, so focus moves to a control that
+    // still exists rather than being dropped on <body>
+    await expect(
+      page.getByRole("button", { name: "Add invoice item" }),
+    ).toBeFocused();
+
+    // Verify item is removed
+    await expect(
+      invoiceItemsSection.getByText("Item 2", { exact: true }),
+    ).toBeHidden();
+
+    // Verify total reverts to Item 1 only after deletion (5000)
+    await expect(
+      finalSection.getByRole("textbox", { name: "Total", exact: true }),
+    ).toHaveValue("5,000.00");
+  });
+
+  test("calculates totals correctly", async ({ page }) => {
+    const invoiceItemsSection = page.getByTestId(`invoice-items-section`);
+    const finalSection = page.getByTestId(`final-section`);
+
+    // Item 1: qty=2, price=500, VAT=23% → net=1000, vat=230
+    await invoiceItemsSection
+      .getByRole("spinbutton", { name: "Amount (Quantity)", exact: true })
+      .nth(0)
+      .fill("2");
+    await invoiceItemsSection
+      .getByRole("spinbutton", {
+        name: "Net Price (Rate or Unit Price)",
+        exact: true,
+      })
+      .nth(0)
+      .fill("500");
+    await invoiceItemsSection
+      .getByRole("textbox", { name: "VAT Rate", exact: true })
+      .nth(0)
+      .fill("23");
+
+    await expect(
+      invoiceItemsSection
+        .getByRole("textbox", { name: "Net Amount", exact: true })
+        .nth(0),
+    ).toHaveValue("1,000.00");
+    await expect(
+      invoiceItemsSection
+        .getByRole("textbox", { name: "VAT Amount", exact: true })
+        .nth(0),
+    ).toHaveValue("230.00");
+
+    // Add Item 2: qty=5, price=1000, VAT=NP → net=5000, vat=0
+    await invoiceItemsSection
+      .getByRole("button", { name: "Add invoice item" })
+      .click();
+    await expect(
+      invoiceItemsSection.getByText("Item 2", { exact: true }),
+    ).toBeVisible();
+
+    await invoiceItemsSection
+      .getByRole("spinbutton", { name: "Amount (Quantity)", exact: true })
+      .nth(1)
+      .fill("5");
+    await invoiceItemsSection
+      .getByRole("spinbutton", {
+        name: "Net Price (Rate or Unit Price)",
+        exact: true,
+      })
+      .nth(1)
+      .fill("1000");
+
+    await expect(
+      invoiceItemsSection
+        .getByRole("textbox", { name: "Net Amount", exact: true })
+        .nth(1),
+    ).toHaveValue("5,000.00");
+    await expect(
+      invoiceItemsSection
+        .getByRole("textbox", { name: "VAT Amount", exact: true })
+        .nth(1),
+    ).toHaveValue("0.00");
+
+    // Add Item 3: qty=1, price=10000, VAT=10% → net=10000, vat=1000
+    await invoiceItemsSection
+      .getByRole("button", { name: "Add invoice item" })
+      .click();
+    await expect(
+      invoiceItemsSection.getByText("Item 3", { exact: true }),
+    ).toBeVisible();
+
+    await invoiceItemsSection
+      .getByRole("spinbutton", {
+        name: "Net Price (Rate or Unit Price)",
+        exact: true,
+      })
+      .nth(2)
+      .fill("10000");
+    await invoiceItemsSection
+      .getByRole("textbox", { name: "VAT Rate", exact: true })
+      .nth(2)
+      .fill("10");
+
+    await expect(
+      invoiceItemsSection
+        .getByRole("textbox", { name: "Net Amount", exact: true })
+        .nth(2),
+    ).toHaveValue("10,000.00");
+    await expect(
+      invoiceItemsSection
+        .getByRole("textbox", { name: "VAT Amount", exact: true })
+        .nth(2),
+    ).toHaveValue("1,000.00");
+
+    // Grand total = 1230 + 5000 + 11000 = 17,230.00
+    await expect(
+      finalSection.getByRole("textbox", {
+        name: "Total",
+        exact: true,
+      }),
+    ).toHaveValue("17,230.00");
+  });
+
+  test("handles form validation", async ({ page }) => {
+    // Clear required fields
+    await page.getByRole("textbox", { name: "Date of Issue" }).clear();
+
+    // Clear name field on the seller section
+    const sellerSection = page.getByTestId(`seller-information-section`);
+    await sellerSection.getByRole("textbox", { name: "Name" }).clear();
+
+    const buyerSection = page.getByTestId(`buyer-information-section`);
+    await buyerSection.getByRole("textbox", { name: "Name" }).clear();
+
+    // Clear name field on the first invoice item
+    const invoiceItemsSection = page.getByTestId(`invoice-items-section`);
+    await invoiceItemsSection.getByRole("textbox", { name: "Name" }).clear();
+
+    await expect(
+      sellerSection.getByText("Seller name is required", { exact: true }),
+    ).toBeVisible();
+
+    // Check that notification is also visible
+    await expect(
+      page
+        .getByLabel("Notifications alt+T")
+        .getByText("Seller name is required"),
+    ).toBeVisible();
+
+    await expect(
+      buyerSection.getByText("Buyer name is required", { exact: true }),
+    ).toBeVisible();
+
+    // Check that notification is also visible
+    await expect(
+      page
+        .getByLabel("Notifications alt+T")
+        .getByText("Buyer name is required"),
+    ).toBeVisible();
+
+    const dateOfIssue = dayjs().format("YYYY-MM-DD");
+
+    const invoiceNumberFieldset = page.getByRole("group", {
+      name: "Invoice Number",
+    });
+
+    const invoiceNumberValueField = invoiceNumberFieldset.getByRole("textbox", {
+      name: "Value",
+    });
+
+    await invoiceNumberValueField.fill("1/03-2025");
+
+    await page
+      .getByRole("textbox", { name: "Date of Issue" })
+      .fill(dateOfIssue);
+
+    // Check if the date of issue is filled in correctly
+    await expect(
+      page.getByRole("textbox", { name: "Date of Issue" }),
+    ).toHaveValue(dateOfIssue);
+
+    // Fill in seller name
+    await sellerSection
+      .getByRole("textbox", { name: "Name" })
+      .fill("Test Seller");
+
+    // Fill in buyer name
+    await buyerSection
+      .getByRole("textbox", { name: "Name" })
+      .fill("Test Buyer");
+
+    // Check for error messages to be hidden
+
+    await expect(
+      sellerSection.getByText("Seller name is required", { exact: true }),
+    ).toBeHidden();
+
+    // Check that notification is also hidden
+    await expect(page.getByLabel("Notifications alt+T")).toBeHidden();
+
+    await expect(
+      buyerSection.getByText("Buyer name is required", { exact: true }),
+    ).toBeHidden();
+
+    // Check that notification is also hidden
+    await expect(page.getByLabel("Notifications alt+T")).toBeHidden();
+  });
+
+  test(
+    "persists data in local storage",
+    {
+      // form state -> localStorage -> rehydrate on reload, verified on Gecko and
+      // desktop WebKit too
+      tag: ["@firefox-smoke", "@webkit-desktop-smoke"],
+    },
+    async ({ page }) => {
+      // Fill in some data
+      const invoiceNumberFieldset = page.getByRole("group", {
+        name: "Invoice Number",
+      });
+
+      const invoiceNumberValueField = invoiceNumberFieldset.getByRole(
+        "textbox",
+        {
+          name: "Value",
+        },
+      );
+
+      await invoiceNumberValueField.fill("TEST/2024");
+
+      const finalSection = page.getByTestId(`final-section`);
+
+      await finalSection
+        .getByRole("textbox", { name: "Notes", exact: true })
+        .fill("Test note");
+
+      // Check that "Invoice last updated:" text is displayed after filling in the data
+      await expect(
+        page.getByText("Invoice last updated:", { exact: false }),
+      ).toBeVisible();
+
+      // The form only writes to localStorage after DEBOUNCE_TIMEOUT (500ms), and a
+      // loaded CI machine can push that write past a fixed 500ms wait, which is what
+      // made this flaky (localStorage still empty when it was read). Poll until the
+      // stored payload matches instead of sleeping for exactly one debounce.
+      await expect
+        .poll(async () => {
+          const storedData = await page.evaluate((key) => {
+            return localStorage.getItem(key);
+          }, PDF_DATA_LOCAL_STORAGE_KEY);
+
+          return storedData ? (JSON.parse(storedData) as InvoiceData) : null;
+        })
+        .toMatchObject({
+          invoiceNumberObject: {
+            label: "Invoice No. of:",
+            value: "TEST/2024",
+          },
+          notes: "Test note",
+        } satisfies Pick<InvoiceData, "notes" | "invoiceNumberObject">);
+
+      // Reload page
+      await page.reload();
+
+      // Check if data persists in UI
+      const invoiceNumberFieldset2 = page.getByRole("group", {
+        name: "Invoice Number",
+      });
+
+      const invoiceNumberValueField2 = invoiceNumberFieldset2.getByRole(
+        "textbox",
+        {
+          name: "Value",
+        },
+      );
+      await expect(invoiceNumberValueField2).toHaveValue("TEST/2024");
+
+      await expect(
+        finalSection.getByRole("textbox", { name: "Notes", exact: true }),
+      ).toHaveValue("Test note");
+    },
+  );
+
+  test("handles currency switching", async ({ page }) => {
+    const invoiceItemsSection = page.getByTestId(`invoice-items-section`);
+
+    const netPriceFormElement =
+      invoiceItemsSection.getByTestId(`itemNetPrice0`);
+
+    const netAmountFormElement =
+      invoiceItemsSection.getByTestId(`itemNetAmount0`);
+
+    // Verify initial currency
+    await expect(netPriceFormElement).toHaveText("€EUR");
+    await expect(netAmountFormElement).toHaveText("€EUR");
+
+    await expect(
+      invoiceItemsSection.getByText("Preview: 0.00 EUR (zero EUR 00/100)"),
+    ).toBeVisible();
+
+    const currencyCombobox = page.getByRole("combobox", { name: "Currency" });
+
+    // Switch currency via combobox
+    await currencyCombobox.click();
+    await page.getByRole("option", { name: /^USD\s/ }).click();
+
+    await expect(currencyCombobox).toContainText("USD");
+
+    // check that value is saved in the hidden input
+    await expect(page.locator('input[name="currency"]')).toHaveValue("USD");
+
+    // Verify calculations with new currency
+    await invoiceItemsSection
+      .getByRole("spinbutton", { name: "Amount (Quantity)", exact: true })
+      .fill("2");
+    await invoiceItemsSection
+      .getByRole("spinbutton", {
+        name: "Net Price (Rate or Unit Price)",
+        exact: true,
+      })
+      .fill("100.75");
+
+    await expect(netPriceFormElement).toHaveText("$USD");
+    await expect(netAmountFormElement).toHaveText("$USD");
+
+    await expect(
+      invoiceItemsSection.getByText(
+        "Preview: 100.75 USD (one hundred USD 75/100)",
+        {
+          exact: true,
+        },
+      ),
+    ).toBeVisible();
+
+    const finalSection = page.getByTestId(`final-section`);
+    await expect(
+      finalSection.getByRole("textbox", {
+        name: "Total",
+        exact: true,
+      }),
+    ).toHaveValue("201.50");
+  });
+
+  test("accordion items are visible, collapsible and saved in the local storage", async ({
+    page,
+  }) => {
+    // Define sections with their labels
+    const sections = [
+      { id: "general-information-section", label: "General Information" },
+      { id: "seller-information-section", label: "Seller Information" },
+      { id: "buyer-information-section", label: "Buyer Information" },
+      { id: "invoice-items-section", label: "Items and pricing" },
+    ] as const;
+
+    // Verify all sections are initially visible and expanded
+    for (const section of sections) {
+      const sectionElement = page.getByTestId(section.id);
+      await expect(sectionElement).toBeVisible();
+      await expect(
+        sectionElement.getByRole("region", { name: section.label }),
+      ).toBeVisible();
+    }
+
+    // Collapse specific sections to create mixed state
+    await page
+      .getByTestId("seller-information-section")
+      .getByRole("button", { name: "Seller Information" })
+      .click();
+
+    await page
+      .getByTestId("invoice-items-section")
+      .getByRole("button", { name: "Items and pricing", exact: true })
+      .click();
+
+    // Verify mixed state: general and buyer expanded, seller and items collapsed
+    await expect(
+      page
+        .getByTestId("general-information-section")
+        .getByRole("region", { name: "General Information" }),
+    ).toBeVisible();
+
+    await expect(
+      page
+        .getByTestId("seller-information-section")
+        .getByRole("region", { name: "Seller Information" }),
+    ).toBeHidden();
+
+    await expect(
+      page
+        .getByTestId("buyer-information-section")
+        .getByRole("region", { name: "Buyer Information" }),
+    ).toBeVisible();
+
+    await expect(
+      page
+        .getByTestId("invoice-items-section")
+        .getByRole("region", { name: "Items and pricing", exact: true }),
+    ).toBeHidden();
+
+    // Verify the state is saved in localStorage
+    const storedState = (await page.evaluate((key) => {
+      return localStorage.getItem(key);
+    }, ACCORDION_STATE_LOCAL_STORAGE_KEY)) as string;
+
+    expect(storedState).toBeTruthy();
+
+    const parsedState = JSON.parse(storedState) as AccordionState;
+
+    expect(parsedState).toEqual({
+      general: true,
+      seller: false,
+      buyer: true,
+      invoiceItems: false,
+    } as const satisfies AccordionState);
+
+    // Reload the page and verify state persistence
+    await page.reload();
+
+    // Verify state persists after reload
+    await expect(
+      page
+        .getByTestId("general-information-section")
+        .getByRole("region", { name: "General Information" }),
+    ).toBeVisible();
+
+    await expect(
+      page
+        .getByTestId("seller-information-section")
+        .getByRole("region", { name: "Seller Information" }),
+    ).toBeHidden();
+
+    await expect(
+      page
+        .getByTestId("buyer-information-section")
+        .getByRole("region", { name: "Buyer Information" }),
+    ).toBeVisible();
+
+    await expect(
+      page
+        .getByTestId("invoice-items-section")
+        .getByRole("region", { name: "Items and pricing", exact: true }),
+    ).toBeHidden();
+
+    // Toggle states after reload
+    await page
+      .getByTestId("general-information-section")
+      .getByRole("button", { name: "General Information" })
+      .click();
+
+    await page
+      .getByTestId("seller-information-section")
+      .getByRole("button", { name: "Seller Information" })
+      .click();
+
+    // Verify new toggled state
+    await expect(
+      page
+        .getByTestId("general-information-section")
+        .getByRole("region", { name: "General Information" }),
+    ).toBeHidden();
+
+    await expect(
+      page
+        .getByTestId("seller-information-section")
+        .getByRole("region", { name: "Seller Information" }),
+    ).toBeVisible();
+
+    await expect(
+      page
+        .getByTestId("buyer-information-section")
+        .getByRole("region", { name: "Buyer Information" }),
+    ).toBeVisible();
+
+    await expect(
+      page
+        .getByTestId("invoice-items-section")
+        .getByRole("region", { name: "Items and pricing", exact: true }),
+    ).toBeHidden();
+
+    // Verify updated state is saved in localStorage
+    const updatedStoredState = (await page.evaluate((key) => {
+      return localStorage.getItem(key);
+    }, ACCORDION_STATE_LOCAL_STORAGE_KEY)) as string;
+
+    expect(updatedStoredState).toBeTruthy();
+
+    const updatedParsedState = JSON.parse(updatedStoredState) as AccordionState;
+    expect(updatedParsedState).toEqual({
+      general: false,
+      seller: true,
+      buyer: true,
+      invoiceItems: false,
+    } as const satisfies AccordionState);
+  });
+
+  test("validates amount, net price and VAT fields in invoice items section", async ({
+    page,
+  }) => {
+    const invoiceItemsSection = page.getByTestId(`invoice-items-section`);
+
+    // **AMOUNT FIELD**
+    const amountInput = invoiceItemsSection.getByRole("spinbutton", {
+      name: "Amount (Quantity)",
+    });
+
+    // Test invalid values
+    await amountInput.fill("-1");
+    await expect(
+      invoiceItemsSection.getByText("Amount must be >= 0"),
+    ).toBeVisible();
+
+    // Check that notification is also visible
+    await expect(
+      page.getByLabel("Notifications alt+T").getByText("Amount must be >= 0"),
+    ).toBeVisible();
+
+    await amountInput.fill("1000000"); // Exceeds max of 999 999.99
+    await expect(
+      invoiceItemsSection.getByText("Amount must not exceed 999 999.99"),
+    ).toBeVisible();
+
+    // Check that notification is also visible
+    await expect(
+      page
+        .getByLabel("Notifications alt+T")
+        .getByText("Amount must not exceed 999 999.99"),
+    ).toBeVisible();
+
+    // Test valid values
+    await amountInput.fill("0");
+    await expect(
+      invoiceItemsSection.getByText("Amount must be >= 0"),
+    ).toBeHidden();
+    await expect(
+      invoiceItemsSection.getByText("Amount must not exceed 999 999.99"),
+    ).toBeHidden();
+
+    await amountInput.fill("1");
+    await expect(
+      invoiceItemsSection.getByText("Amount must be >= 0"),
+    ).toBeHidden();
+    await expect(
+      invoiceItemsSection.getByText("Amount must not exceed 999 999.99"),
+    ).toBeHidden();
+
+    await amountInput.fill("999999.99"); // Maximum valid value
+    await expect(
+      invoiceItemsSection.getByText("Amount must be >= 0"),
+    ).toBeHidden();
+    await expect(
+      invoiceItemsSection.getByText("Amount must not exceed 999 999.99"),
+    ).toBeHidden();
+
+    // **NET PRICE FIELD**
+
+    const netPriceInput = invoiceItemsSection.getByRole("spinbutton", {
+      name: "Net Price",
+    });
+
+    // Test negative value
+    await netPriceInput.fill("-100");
+    await expect(
+      invoiceItemsSection.getByText("Net price must be >= 0"),
+    ).toBeVisible();
+
+    // Check that notification is also visible
+    await expect(
+      page
+        .getByLabel("Notifications alt+T")
+        .getByText("Net price must be >= 0"),
+    ).toBeVisible();
+
+    // Test exceeding maximum value
+    await netPriceInput.fill("1000000000000"); // 1 trillion
+    await expect(
+      invoiceItemsSection.getByText("Net price must not exceed 1 billion"),
+    ).toBeVisible();
+
+    // Check that notification is also visible
+    await expect(
+      page
+        .getByLabel("Notifications alt+T")
+        .getByText("Net price must not exceed 1 billion"),
+    ).toBeVisible();
+
+    // Test zero value
+    await netPriceInput.fill("0");
+    await expect(
+      invoiceItemsSection.getByText("Net price must be >= 0"),
+    ).toBeHidden();
+
+    // Test valid value
+    await netPriceInput.fill("1");
+    await expect(
+      invoiceItemsSection.getByText("Net price must be >= 0"),
+    ).toBeHidden();
+    await expect(
+      invoiceItemsSection.getByText("Net price must not exceed 1 billion"),
+    ).toBeHidden();
+
+    await netPriceInput.fill("1000000000"); // Maximum valid value
+    await expect(
+      invoiceItemsSection.getByText("Net price must be >= 0"),
+    ).toBeHidden();
+    await expect(
+      invoiceItemsSection.getByText("Net price must not exceed 1 billion"),
+    ).toBeHidden();
+
+    // **VAT FIELD**
+
+    const vatInput = invoiceItemsSection.getByRole("textbox", {
+      name: "VAT Rate",
+      exact: true,
+    });
+
+    const helperText = `Tax rate must be a number between 0-100 or any text (i.e. NP, OO, etc).`;
+
+    // Try invalid values
+    await vatInput.fill("101");
+    await expect(invoiceItemsSection.getByText(helperText)).toBeVisible();
+
+    // Check that notification is also visible
+    await expect(
+      page.getByLabel("Notifications alt+T").getByText(helperText),
+    ).toBeVisible();
+
+    await vatInput.fill("-1");
+    await expect(invoiceItemsSection.getByText(helperText)).toBeVisible();
+
+    // Try valid values
+    await vatInput.fill("23");
+    await expect(invoiceItemsSection.getByText(helperText)).toBeHidden();
+
+    await vatInput.fill("NP");
+    await expect(invoiceItemsSection.getByText(helperText)).toBeHidden();
+
+    await vatInput.fill("OO");
+    await expect(invoiceItemsSection.getByText(helperText)).toBeHidden();
+
+    await vatInput.fill("CUSTOM");
+    await expect(invoiceItemsSection.getByText(helperText)).toBeHidden();
+  });
+
+  test("handles VAT calculations for different rates", async ({ page }) => {
+    // Test with different VAT rates
+    const testCases = [
+      {
+        vat: "23",
+        amount: "100",
+        netPrice: "100",
+        expected: {
+          net: "10,000.00",
+          vatAmount: "2,300.00",
+          total: "12,300.00",
+        },
+      },
+      {
+        vat: "8",
+        amount: "100",
+        netPrice: "100",
+        expected: { net: "10,000.00", vatAmount: "800.00", total: "10,800.00" },
+      },
+      {
+        vat: "0",
+        amount: "100",
+        netPrice: "100",
+        expected: { net: "10,000.00", vatAmount: "0.00", total: "10,000.00" },
+      },
+      {
+        vat: "NP",
+        amount: "100",
+        netPrice: "100",
+        expected: { net: "10,000.00", vatAmount: "0.00", total: "10,000.00" },
+      },
+      {
+        vat: "OO",
+        amount: "3",
+        netPrice: "100",
+        expected: { net: "300.00", vatAmount: "0.00", total: "300.00" },
+      },
+      {
+        vat: "23",
+        amount: "0",
+        netPrice: "100",
+        expected: { net: "0.00", vatAmount: "0.00", total: "0.00" },
+      },
+    ] as const satisfies {
+      vat: string;
+      amount: string;
+      netPrice: string;
+      expected: { net: string; vatAmount: string; total: string };
+    }[];
+
+    const invoiceItemsSection = page.getByTestId(`invoice-items-section`);
+    const amountInput = invoiceItemsSection.getByRole("spinbutton", {
+      name: "Amount (Quantity)",
+      exact: true,
+    });
+    const netPriceInput = invoiceItemsSection.getByRole("spinbutton", {
+      name: "Net Price (Rate or Unit Price)",
+      exact: true,
+    });
+    const vatInput = invoiceItemsSection.getByRole("textbox", {
+      name: "VAT Rate",
+      exact: true,
+    });
+
+    for (const testCase of testCases) {
+      // Fill in values
+      await amountInput.fill(testCase.amount);
+      await netPriceInput.fill(testCase.netPrice);
+      await vatInput.fill(testCase.vat);
+
+      // Check calculations
+      await expect(
+        invoiceItemsSection.getByRole("textbox", {
+          name: "Net Amount",
+          exact: true,
+        }),
+      ).toHaveValue(testCase.expected.net);
+
+      await expect(
+        invoiceItemsSection.getByRole("textbox", {
+          name: "VAT Amount",
+          exact: true,
+        }),
+      ).toHaveValue(testCase.expected.vatAmount);
+
+      await expect(
+        invoiceItemsSection.getByRole("textbox", {
+          name: "Pre-tax Amount",
+          exact: true,
+        }),
+      ).toHaveValue(testCase.expected.total);
+
+      await expect(
+        page.getByRole("textbox", {
+          name: "Total",
+          exact: true,
+        }),
+      ).toHaveValue(testCase.expected.total);
+    }
+  });
+
+  test("displays helper messages when dates are out of date and allows updating all dates", async ({
+    page,
+  }) => {
+    // we set the system time to a fixed date, so that the invoice number and other dates are consistent across tests
+    await page.clock.setSystemTime(new Date("2025-12-01T00:00:00Z"));
+
+    await page.goto("/");
+    await expect(page).toHaveURL("/");
+
+    const generalInfoSection = page.getByRole("region", {
+      name: "General Information",
+    });
+    const dateOfIssueInput = generalInfoSection.getByLabel("Date of Issue");
+    await dateOfIssueInput.fill("2024-01-15");
+
+    // Verify per-field "Date of issue is not today" inline helper message
+    await expect(
+      generalInfoSection.getByText("Date of issue is not today"),
+    ).toBeVisible();
+
+    // Set service period end to a date that's not the last day of current month
+    const dateOfServiceStartInput = generalInfoSection.getByRole("textbox", {
+      name: "Service period start",
+    });
+    const dateOfServiceInput = generalInfoSection.getByRole("textbox", {
+      name: "Service period end",
+    });
+    await dateOfServiceStartInput.fill("2025-06-14");
+    await dateOfServiceInput.fill("2024-01-20");
+
+    // Verify per-field service period start helper message
+    await expect(
+      generalInfoSection.getByText(
+        "Service period start is not in the current month",
+      ),
+    ).toBeVisible();
+
+    // Verify per-field service period end helper message
+    await expect(
+      generalInfoSection.getByText(
+        "Service period end is not the last day of the current month",
+      ),
+    ).toBeVisible();
+
+    // Set invoice number to an old month to trigger stale state
+    const invoiceNumberInput = generalInfoSection.getByLabel("Value");
+    await invoiceNumberInput.fill("1/01-2024");
+
+    // Verify per-field "Invoice number does not match current month" inline helper message
+    await expect(
+      generalInfoSection.getByText(
+        "Invoice number does not match current month",
+      ),
+    ).toBeVisible();
+
+    // Set payment due to a stale date (date of issue + 1 day instead of + 14 days)
+    const paymentDueInput = page.getByLabel("Payment Due");
+    await paymentDueInput.fill("2024-01-16");
+
+    const paymentDueBtn = page.getByRole("button", {
+      name: "Set payment due date to 2024-01-29 (14 days from issue date)",
+    });
+    await expect(paymentDueBtn).toBeVisible();
+    await expect(paymentDueBtn).toBeEnabled();
+
+    // Verify the OutOfDateDatesHelper component appears with the table-based UI
+    const outOfDateHelper = page.getByTestId("out-of-date-dates-helper");
+    await expect(outOfDateHelper).toBeVisible();
+
+    // Verify the header shows the correct count of stale fields
+    await expect(
+      outOfDateHelper.getByText("5 fields are out of date"),
+    ).toBeVisible();
+
+    // Verify each stale field appears as a row in the table
+    await expect(
+      outOfDateHelper.getByText("Date of issue", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      outOfDateHelper.getByText("Service period start", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      outOfDateHelper.getByText("Service period end", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      outOfDateHelper.getByText("Invoice number", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      outOfDateHelper.getByText("Payment due", { exact: true }),
+    ).toBeVisible();
+
+    // Verify the table shows old → new values per row (avoids strict mode when targets match)
+    const dateOfIssueRow = outOfDateHelper
+      .getByRole("row")
+      .filter({ hasText: "Date of issue" });
+
+    await expect(dateOfIssueRow.getByText("2024-01-15")).toBeVisible();
+    await expect(dateOfIssueRow.getByText("2025-12-01")).toBeVisible();
+
+    const servicePeriodStartRow = outOfDateHelper
+      .getByRole("row")
+      .filter({ hasText: "Service period start" });
+
+    await expect(servicePeriodStartRow.getByText("2025-06-14")).toBeVisible();
+    await expect(servicePeriodStartRow.getByText("2025-12-01")).toBeVisible();
+
+    const servicePeriodEndRow = outOfDateHelper
+      .getByRole("row")
+      .filter({ hasText: "Service period end" });
+    await expect(servicePeriodEndRow.getByText("2024-01-20")).toBeVisible();
+    await expect(servicePeriodEndRow.getByText("2025-12-31")).toBeVisible();
+
+    const invoiceNumberRow = outOfDateHelper
+      .getByRole("row")
+      .filter({ hasText: "Invoice number" });
+    await expect(invoiceNumberRow.getByText("1/01-2024")).toBeVisible();
+    await expect(invoiceNumberRow.getByText("1/12-2025")).toBeVisible();
+
+    const paymentDueRow = outOfDateHelper
+      .getByRole("row")
+      .filter({ hasText: "Payment due" });
+    await expect(paymentDueRow.getByText("2024-01-16")).toBeVisible();
+    await expect(paymentDueRow.getByText("2025-12-15")).toBeVisible();
+
+    // Verify the "Update All Dates" button is visible
+    const updateAllDatesButton = outOfDateHelper.getByRole("button", {
+      name: "Update All Dates",
+    });
+    await expect(updateAllDatesButton).toBeVisible();
+
+    // Click the "Update All Dates" button
+    await updateAllDatesButton.click();
+
+    // Verify the OutOfDateDatesHelper component disappears
+    await expect(outOfDateHelper).toBeHidden();
+
+    // Verify the success toast is visible
+    await expect(
+      page.getByText("All dates updated successfully"),
+    ).toBeVisible();
+
+    // Verify per-field inline helper messages are gone
+    await expect(
+      generalInfoSection.getByText("Date of issue is not today"),
+    ).toBeHidden();
+    await expect(
+      generalInfoSection.getByText(
+        "Service period end is not the last day of the current month",
+      ),
+    ).toBeHidden();
+    await expect(
+      generalInfoSection.getByText(
+        "Service period start is not in the current month",
+      ),
+    ).toBeHidden();
+
+    // Verify all fields were updated to correct values
+    await expect(dateOfIssueInput).toHaveValue("2025-12-01");
+    await expect(dateOfServiceStartInput).toHaveValue("2025-12-01");
+    await expect(dateOfServiceInput).toHaveValue("2025-12-31");
+    await expect(invoiceNumberInput).toHaveValue("1/12-2025");
+    await expect(paymentDueInput).toHaveValue("2025-12-15");
+  });
+
+  test("allows setting date of issue to today from inline helper", async ({
+    page,
+  }) => {
+    await page.clock.setSystemTime(new Date("2025-12-01T00:00:00Z"));
+
+    await page.goto("/");
+    await expect(page).toHaveURL("/");
+
+    const generalInfoSection = page.getByRole("region", {
+      name: "General Information",
+    });
+    const dateOfIssueInput = generalInfoSection.getByLabel("Date of Issue");
+
+    await dateOfIssueInput.fill("2024-01-15");
+
+    await expect(
+      generalInfoSection.getByText("Date of issue is not today"),
+    ).toBeVisible();
+
+    await generalInfoSection
+      .getByRole("button", { name: /Set date of issue to today/ })
+      .click();
+
+    await expect(dateOfIssueInput).toHaveValue("2025-12-01");
+    await expect(
+      generalInfoSection.getByText("Date of issue is not today"),
+    ).toBeHidden();
+    await expect(page.getByLabel("Payment Due")).toHaveValue("2025-12-15");
+  });
+
+  test("allows resetting service period PDF label from the inline helper", async ({
+    page,
+  }) => {
+    const generalInfoSection = page.getByRole("region", {
+      name: "General Information",
+    });
+    const servicePeriodFieldset = generalInfoSection.getByRole("group", {
+      name: "Service period",
+    });
+    const servicePeriodLabelInput = servicePeriodFieldset.getByRole("textbox", {
+      name: "Service period PDF label",
+    });
+    const defaultLabel = INVOICE_PDF_TRANSLATIONS.en.servicePeriod;
+    const resetToDefaultButton = servicePeriodFieldset.getByRole("button", {
+      name: `Reset to default ("${defaultLabel}")`,
+    });
+
+    await servicePeriodLabelInput.fill("Custom service period label");
+
+    await expect(resetToDefaultButton).toBeVisible();
+
+    await resetToDefaultButton.click();
+
+    await expect(servicePeriodLabelInput).toHaveValue(defaultLabel);
+    await expect(resetToDefaultButton).toBeHidden();
+  });
+
+  test("allows resetting date of sales PDF label from the inline helper", async ({
+    page,
+  }) => {
+    const generalInfoSection = page.getByRole("region", {
+      name: "General Information",
+    });
+    const servicePeriodFieldset = generalInfoSection.getByRole("group", {
+      name: "Service period",
+    });
+    const dateOfServiceLabelInput = servicePeriodFieldset.getByRole("textbox", {
+      name: "Date of sales PDF label",
+    });
+    const defaultLabel = INVOICE_PDF_TRANSLATIONS.en.dateOfService;
+    const resetToDefaultButton = servicePeriodFieldset.getByRole("button", {
+      name: `Reset to default ("${defaultLabel}")`,
+    });
+
+    await dateOfServiceLabelInput.fill("Custom date of sales label");
+
+    await expect(resetToDefaultButton).toBeVisible();
+
+    await resetToDefaultButton.click();
+
+    await expect(dateOfServiceLabelInput).toHaveValue(defaultLabel);
+    await expect(resetToDefaultButton).toBeHidden();
+  });
+
+  test("allows setting a partial service period", async ({ page }) => {
+    await page.clock.setSystemTime(new Date("2025-06-15T12:00:00Z"));
+
+    await page.goto("/");
+    await expect(page).toHaveURL("/");
+
+    const generalInfoSection = page.getByRole("region", {
+      name: "General Information",
+    });
+
+    const servicePeriodFieldset = generalInfoSection.getByRole("group", {
+      name: "Service period",
+    });
+
+    const servicePeriodSwitch = servicePeriodFieldset.getByRole("switch", {
+      name: 'Show the "Service period" (Service period start and end) field in the PDF',
+    });
+
+    await servicePeriodFieldset
+      .getByRole("textbox", { name: "Service period start" })
+      .fill("2025-06-14");
+    await servicePeriodFieldset
+      .getByRole("textbox", { name: "Service period end" })
+      .fill("2025-06-20");
+
+    await expect(
+      servicePeriodFieldset.getByRole("textbox", {
+        name: "Service period start",
+      }),
+    ).toHaveValue("2025-06-14");
+    await expect(
+      servicePeriodFieldset.getByRole("textbox", {
+        name: "Service period end",
+      }),
+    ).toHaveValue("2025-06-20");
+
+    // filling the dates never touches the PDF visibility switch
+    await expect(servicePeriodSwitch).not.toBeChecked();
+
+    await servicePeriodSwitch.click();
+    await expect(servicePeriodSwitch).toBeChecked();
+
+    // ...and neither does editing them afterwards, in either direction
+    await servicePeriodFieldset
+      .getByRole("textbox", { name: "Service period start" })
+      .fill("2025-06-15");
+    await expect(servicePeriodSwitch).toBeChecked();
+
+    await servicePeriodSwitch.click();
+    await expect(servicePeriodSwitch).not.toBeChecked();
+
+    await servicePeriodFieldset
+      .getByRole("textbox", { name: "Service period start" })
+      .fill("2025-06-16");
+    await expect(servicePeriodSwitch).not.toBeChecked();
+  });
+
+  test("validates service period start is on or before end date", async ({
+    page,
+  }) => {
+    const generalInfoSection = page.getByRole("region", {
+      name: "General Information",
+    });
+    const servicePeriodFieldset = generalInfoSection.getByRole("group", {
+      name: "Service period",
+    });
+    const servicePeriodStartInput = servicePeriodFieldset.getByRole("textbox", {
+      name: "Service period start",
+    });
+    const servicePeriodEndInput = servicePeriodFieldset.getByRole("textbox", {
+      name: "Service period end",
+    });
+
+    const errorMessage =
+      "Service period start must be on or before the end date";
+    const notifications = page.getByLabel("Notifications alt+T");
+
+    await servicePeriodEndInput.fill("2025-06-15");
+    await servicePeriodStartInput.fill("2025-06-20");
+
+    await expect(
+      servicePeriodFieldset.getByText(errorMessage, { exact: true }),
+    ).toBeVisible();
+
+    await expect(
+      notifications.getByText("Please fix the following errors:"),
+    ).toBeVisible();
+
+    await expect(notifications.getByText(errorMessage)).toBeVisible();
+
+    await servicePeriodStartInput.fill("2025-06-15");
+
+    await expect(
+      servicePeriodFieldset.getByText(errorMessage, { exact: true }),
+    ).toBeHidden();
+
+    await expect(
+      notifications.getByText("Please fix the following errors:"),
+    ).toBeHidden();
+
+    await expect(notifications.getByText(errorMessage)).toBeHidden();
+  });
+});

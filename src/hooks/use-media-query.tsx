@@ -1,0 +1,91 @@
+import { useEffect, useRef, useState } from "react";
+
+interface UseMediaQueryOptions {
+  getInitialValueInEffect: boolean;
+}
+
+type MediaQueryCallback = (event: { matches: boolean; media: string }) => void;
+
+/**
+ * Older versions of Safari (shipped withCatalina and before) do not support addEventListener on matchMedia
+ * https://stackoverflow.com/questions/56466261/matchmedia-addlistener-marked-as-deprecated-addeventlistener-equivalent
+ * */
+function attachMediaListener(
+  query: MediaQueryList,
+  callback: MediaQueryCallback,
+) {
+  try {
+    query.addEventListener("change", callback);
+    return () => {
+      return query.removeEventListener("change", callback);
+    };
+  } catch {
+    // deprecated on purpose: this is the fallback path for Safari <= Catalina,
+    // which has no `addEventListener` on MediaQueryList (see the note above)
+    // oxlint-disable-next-line typescript/no-deprecated
+    query.addListener(callback);
+    return () => {
+      // oxlint-disable-next-line typescript/no-deprecated
+      return query.removeListener(callback);
+    };
+  }
+}
+
+function getInitialValue(query: string, initialValue?: boolean) {
+  if (typeof initialValue === "boolean") {
+    return initialValue;
+  }
+
+  if (typeof window !== "undefined" && "matchMedia" in window) {
+    return window.matchMedia(query).matches;
+  }
+
+  return false;
+}
+
+function useMediaQuery(
+  query: string,
+  initialValue?: boolean,
+  options?: UseMediaQueryOptions,
+) {
+  const { getInitialValueInEffect } = options ?? {
+    getInitialValueInEffect: true,
+  };
+  const [matches, setMatches] = useState(
+    getInitialValueInEffect ? initialValue : getInitialValue(query),
+  );
+  const queryRef = useRef<MediaQueryList | null>(null);
+
+  useEffect(() => {
+    if ("matchMedia" in window) {
+      queryRef.current = window.matchMedia(query);
+      setMatches(queryRef.current.matches);
+      return attachMediaListener(queryRef.current, (event) => {
+        return setMatches(event.matches);
+      });
+    }
+
+    return undefined;
+  }, [query]);
+
+  return matches;
+}
+
+export const useIsDesktop = () => {
+  return useMediaQuery("(min-width: 1024px)");
+};
+
+/** Tailwind's `xl` breakpoint, where the marketing demos switch from YouTube to MP4. */
+export const useIsXlUp = () => {
+  return useMediaQuery("(min-width: 1280px)");
+};
+
+/**
+ * The device's Reduced Motion setting, kept live as it changes.
+ *
+ * In place of motion's `useReducedMotion`, which reads the setting once and logs a
+ * "You have Reduced Motion enabled" warning on every dev load where it is on.
+ */
+export const usePrefersReducedMotion = () => {
+  return useMediaQuery("(prefers-reduced-motion: reduce)");
+};
