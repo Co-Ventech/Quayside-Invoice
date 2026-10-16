@@ -51,7 +51,3 @@ The Default and Stripe templates live in `src/app/(main)/(app)/components/invoic
 
 - Saltmarsh Coffee Roasters and the sample customer are made up for demonstration.
 - Some unit tests that use `localStorage` fail on Node 25 because its built-in `localStorage` clashes with the test environment, and a few SEO structured-data tests still expect the original names. Some Playwright e2e tests still expect the removed videos. None of these affect the running app.
-
-## Credits and licence
-
-This project is a modified copy of [EasyInvoicePDF](https://github.com/VladSez/easy-invoice-pdf) by Vlad Sazonau, licensed under the **GNU AGPL-3.0**. The full licence is in `LICENSE`. Under the AGPL, anyone who uses a modified version over a network must be able to get its source code, so keep this repository's source available if you host it.
